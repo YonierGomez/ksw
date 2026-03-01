@@ -32,7 +32,6 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "ksw",
-    "alternateName": "ksw",
     "description": "AI-powered interactive Kubernetes context switcher with natural language, fuzzy search, pins, aliases, groups and history.",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "macOS, Linux",
@@ -122,13 +121,13 @@
 
     /* ── HERO ── */
     .hero {
-      min-height: 100vh;
+      min-height: auto;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 6rem 2rem 4rem;
+      padding: 5.5rem 2rem 3rem;
       position: relative;
       overflow: hidden;
     }
@@ -152,7 +151,7 @@
       border-radius: 999px;
       font-size: .8rem;
       font-weight: 600;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1rem;
       font-family: 'JetBrains Mono', monospace;
     }
     .hero h1 {
@@ -167,14 +166,14 @@
       font-size: clamp(1rem, 2vw, 1.2rem);
       color: var(--light);
       max-width: 560px;
-      margin: 0 auto 2.5rem;
+      margin: 0 auto 1.5rem;
     }
     .hero-actions {
       display: flex;
       gap: 1rem;
       flex-wrap: wrap;
       justify-content: center;
-      margin-bottom: 3.5rem;
+      margin-bottom: 2rem;
     }
     .btn-primary {
       background: var(--cyan);
@@ -231,7 +230,7 @@
       color: var(--gray);
       font-size: .75rem;
     }
-    .terminal-body { padding: 1.2rem 1.4rem; line-height: 1.9; }
+    .terminal-body { padding: 1.2rem 1.4rem; line-height: 1.9; height: 280px; overflow: hidden; }
     .t-dim    { color: #555; }
     .t-current{ color: var(--gray); }
     .t-val    { color: var(--green); font-weight: 700; }
@@ -259,33 +258,6 @@
       color: var(--gray);
       margin-bottom: 2rem;
     }
-    .code-block {
-      display: inline-flex;
-      align-items: center;
-      gap: 1rem;
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: .9rem 1.4rem;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: .95rem;
-      color: var(--cyan);
-      cursor: pointer;
-      transition: border-color .2s;
-      position: relative;
-    }
-    .code-block:hover { border-color: var(--cyan); }
-    .copy-btn {
-      background: none;
-      border: none;
-      color: var(--gray);
-      cursor: pointer;
-      font-size: .8rem;
-      padding: .2rem .5rem;
-      border-radius: 4px;
-      transition: color .2s, background .2s;
-    }
-    .copy-btn:hover { color: var(--white); background: rgba(255,255,255,.05); }
     .install-steps {
       display: flex;
       flex-direction: column;
@@ -456,16 +428,6 @@
       opacity: 1;
       transform: translateY(0);
     }
-    .reveal-left {
-      opacity: 0;
-      transform: translateX(-24px);
-      transition: opacity 0.5s ease, transform 0.5s ease;
-    }
-    .reveal-left.visible {
-      opacity: 1;
-      transform: translateX(0);
-    }
-    /* stagger delay for grid children */
     .stagger > *:nth-child(1) { transition-delay: 0s; }
     .stagger > *:nth-child(2) { transition-delay: 0.07s; }
     .stagger > *:nth-child(3) { transition-delay: 0.14s; }
@@ -475,6 +437,56 @@
     .stagger > *:nth-child(7) { transition-delay: 0.42s; }
     .stagger > *:nth-child(8) { transition-delay: 0.49s; }
     .stagger > *:nth-child(9) { transition-delay: 0.56s; }
+    .stagger > *:nth-child(10) { transition-delay: 0.63s; }
+
+    /* ── TERMINAL SLIDE ── */
+    .term-slide-container {
+      width: 100%;
+      max-width: 680px;
+    }
+    .term-tabs {
+      display: flex;
+      justify-content: center;
+      gap: .5rem;
+      margin-bottom: 1rem;
+    }
+    .term-tab {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--gray);
+      padding: .4rem 1.2rem;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .3s ease;
+    }
+    .term-tab:hover { color: var(--white); border-color: var(--cyan); }
+    .term-tab.active {
+      background: rgba(0,212,255,.1);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+    .term-slide-track {
+      position: relative;
+      overflow: hidden;
+      border-radius: 12px;
+    }
+    .term-slide-inner {
+      display: flex;
+      width: 200%;
+      transition: transform 0.5s ease;
+    }
+    .term-slide-inner.show-ai {
+      transform: translateX(-50%);
+    }
+    .term-slide-inner > .terminal {
+      width: 50%;
+      flex-shrink: 0;
+      max-width: none;
+      border-radius: 0;
+    }
 
     /* ── RESPONSIVE ── */
     @media (max-width: 640px) {
@@ -489,8 +501,8 @@
 <nav>
   <div class="nav-logo">⎈ <span>ksw</span></div>
   <ul class="nav-links">
-    <li><a href="#ai">AI</a></li>
     <li><a href="#features">Features</a></li>
+    <li><a href="#ai">AI</a></li>
     <li><a href="#install">Install</a></li>
     <li><a href="#usage">Usage</a></li>
     <li><a href="https://github.com/YonierGomez/ksw" target="_blank">GitHub</a></li>
@@ -500,34 +512,49 @@
 
 <!-- HERO -->
 <section class="hero">
-  <div class="badge">🤖 AI-Powered · v1.3.0</div>
-  <h1>Switch Kubernetes<br/>contexts with <span class="accent">AI</span></h1>
-  <p>Talk to your clusters in natural language. Switch contexts, manage groups, pins and aliases — just describe what you need. Powered by OpenAI, Claude, Gemini or AWS Bedrock.</p>
+  <div class="badge">⎈ v1.3.0 · AI-Powered</div>
+  <h1>Switch Kubernetes<br/>contexts <span class="accent">instantly</span></h1>
+  <p>A blazing-fast interactive TUI for navigating Kubernetes contexts. Fuzzy search, pins, aliases, groups, history — now with AI natural language switching. Available for <strong style="color:var(--cyan)">macOS</strong> and <strong style="color:var(--green)">Linux</strong>.</p>
   <div class="hero-actions">
     <a href="#install" class="btn-primary">Install with Homebrew</a>
     <a href="https://github.com/YonierGomez/ksw" target="_blank" class="btn-secondary">View on GitHub →</a>
   </div>
 
-  <!-- Terminal demo — AI -->
-  <div class="terminal">
-    <div class="terminal-bar">
-      <div class="dot dot-red"></div>
-      <div class="dot dot-yellow"></div>
-      <div class="dot dot-green"></div>
-      <div class="terminal-title">ksw ai — natural language context switching</div>
+  <!-- Terminal demos — slide TUI ↔ AI -->
+  <div class="term-slide-container">
+    <div class="term-tabs">
+      <button id="tab-tui" class="term-tab active" onclick="showTerminal(false)">⎈ TUI</button>
+      <button id="tab-ai" class="term-tab" onclick="showTerminal(true)">🤖 AI</button>
     </div>
-    <div class="terminal-body">
-      <div><span class="cmd">$ ksw ai "switch to payments dev"</span></div>
-      <div><span class="out">✔ Switched to arn:.../eks-payments-dev</span></div>
-      <div>&nbsp;</div>
-      <div><span class="cmd">$ ksw ai "create a group called backend with payments and orders"</span></div>
-      <div><span class="out">✔ Group 'backend' created (4 contexts)</span></div>
-      <div>&nbsp;</div>
-      <div><span class="cmd">$ ksw ai "now switch to the same but in qa"</span></div>
-      <div><span class="out">✔ Switched to arn:.../eks-payments-qa</span></div>
-      <div>&nbsp;</div>
-      <div><span class="cmd">$ ksw ai "list my pins and groups as a table"</span></div>
-      <div><span class="t-normal">🤖 AI builds a formatted table from your current state</span></div>
+    <div class="term-slide-track">
+      <div class="term-slide-inner" id="term-slide-inner">
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="dot dot-red"></div>
+            <div class="dot dot-yellow"></div>
+            <div class="dot dot-green"></div>
+            <div class="terminal-title">ksw — interactive context switcher</div>
+          </div>
+          <div class="terminal-body" id="tui-body">
+            <div><span class="t-current">  current </span><span class="t-val">eks-payments-dev</span></div>
+            <div>&nbsp;</div>
+            <div><span class="t-search">  ❯ <span id="tui-search">█</span></span></div>
+            <div><span class="t-dim">  ──────────────────────────────────────────</span></div>
+            <div id="tui-list"></div>
+            <div>&nbsp;</div>
+            <div><span class="t-counter" id="tui-counter">  42/42</span><span class="t-help">  ↑↓ navigate · enter select · ctrl+p pin</span></div>
+          </div>
+        </div>
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="dot dot-red"></div>
+            <div class="dot dot-yellow"></div>
+            <div class="dot dot-green"></div>
+            <div class="terminal-title">ksw ai — natural language context switching</div>
+          </div>
+          <div class="terminal-body" id="ai-body"></div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -583,8 +610,68 @@
   </div>
 </section>
 
+<!-- CORE FEATURES -->
+<section class="features" id="features">
+  <p class="section-label">Why ksw?</p>
+  <h2 class="section-title">Everything you need</h2>
+  <p class="section-sub">Available for macOS and Linux (amd64 & arm64). Designed for engineers who manage dozens of Kubernetes clusters daily.</p>
+
+  <div class="features-grid stagger">
+    <div class="feature-card">
+      <div class="feature-icon">🔍</div>
+      <h3>Fuzzy Search</h3>
+      <p>Type any part of a context name and instantly filter results with intelligent fuzzy matching and scoring.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">⚡</div>
+      <h3>Short-name Switching</h3>
+      <p>Use <code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">ksw payments-dev</code> instead of the full ARN. ksw resolves it automatically.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🏷️</div>
+      <h3>Aliases</h3>
+      <p>Create memorable shortcuts for your most-used contexts. <code style="color:var(--purple);font-family:'JetBrains Mono',monospace;">ksw @prod</code> gets you there instantly.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📌</div>
+      <h3>Pin Favorites</h3>
+      <p>Pin your most-used contexts to always appear at the top. Use <code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">Ctrl+P</code> in the TUI to pin/unpin instantly.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🗂️</div>
+      <h3>Groups</h3>
+      <p>Organize contexts into named groups. <code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">ksw group use payments</code> opens the TUI filtered to only your payments contexts.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">⏮️</div>
+      <h3>Previous Context</h3>
+      <p><code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">ksw -</code> switches back to the last context instantly — like <code style="color:var(--gray);font-family:'JetBrains Mono',monospace;">cd -</code> in bash.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🕐</div>
+      <h3>History</h3>
+      <p><code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">ksw history</code> shows your last 10 contexts. Jump to any entry with <code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">ksw history 3</code>.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🟢</div>
+      <h3>Active Context Highlight</h3>
+      <p>Your current context is always highlighted in green in the list, so you never lose track of where you are.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📜</div>
+      <h3>Smart Scroll</h3>
+      <p>Navigate hundreds of contexts with keyboard shortcuts. The cursor always stays visible on screen.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🛠️</div>
+      <h3>Non-interactive Mode</h3>
+      <p>Use <code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">ksw -l</code> to list contexts in scripts and CI pipelines without launching the TUI.</p>
+    </div>
+  </div>
+</section>
+
 <!-- AI SECTION -->
-<section class="features" id="ai" style="padding-bottom:2rem;">
+<section class="features" id="ai" style="padding-top:2rem;">
   <p class="section-label">🤖 AI-Powered</p>
   <h2 class="section-title">Your clusters, your language</h2>
   <p class="section-sub">Stop memorizing ARNs and commands. Just tell ksw what you need in plain language.</p>
@@ -623,72 +710,12 @@
   </div>
 </section>
 
-<!-- FEATURES -->
-<section class="features" id="features" style="padding-top:2rem;">
-  <p class="section-label">Core Features</p>
-  <h2 class="section-title">Everything else you need</h2>
-  <p class="section-sub">Beyond AI — a full-featured TUI for macOS and Linux. Designed for engineers who manage dozens of Kubernetes clusters daily.</p>
-
-  <div class="features-grid stagger">
-    <div class="feature-card">
-      <div class="feature-icon">🔍</div>
-      <h3>Fuzzy Search</h3>
-      <p>Type any part of a context name and instantly filter results with intelligent fuzzy matching and scoring.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">⚡</div>
-      <h3>Short-name Switching</h3>
-      <p>Use <code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">ksw payments-dev</code> instead of the full ARN. ksw resolves it automatically.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🏷️</div>
-      <h3>Aliases</h3>
-      <p>Create memorable shortcuts for your most-used contexts. <code style="color:var(--purple);font-family:'JetBrains Mono',monospace;">ksw @prod</code> gets you there instantly.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🟢</div>
-      <h3>Active Context Highlight</h3>
-      <p>Your current context is always highlighted in green in the list, so you never lose track of where you are.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">📜</div>
-      <h3>Smart Scroll</h3>
-      <p>Navigate hundreds of contexts with keyboard shortcuts. The cursor always stays visible on screen.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🛠️</div>
-      <h3>Non-interactive Mode</h3>
-      <p>Use <code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">ksw -l</code> to list contexts in scripts and CI pipelines without launching the TUI.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">📌</div>
-      <h3>Pin Favorites</h3>
-      <p>Pin your most-used contexts to always appear at the top. Use <code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">Ctrl+P</code> in the TUI to pin/unpin instantly.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">⏮️</div>
-      <h3>Previous Context</h3>
-      <p><code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">ksw -</code> switches back to the last context instantly — like <code style="color:var(--gray);font-family:'JetBrains Mono',monospace;">cd -</code> in bash. Toggle between two clusters in milliseconds.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🕐</div>
-      <h3>History</h3>
-      <p><code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">ksw history</code> shows your last 10 contexts. Jump to any entry with <code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">ksw history 3</code> — no TUI needed.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🗂️</div>
-      <h3>Groups</h3>
-      <p>Organize contexts into named groups. <code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">ksw group use payments</code> opens the TUI filtered to only your payments contexts — group label shown in header.</p>
-    </div>
-  </div>
-</section>
-
 <!-- USAGE -->
 <section class="usage" id="usage">
   <div class="usage-inner">
     <p class="section-label">Examples</p>
     <h2 class="section-title">How to use it</h2>
-    <p class="section-sub">From interactive navigation to one-liners, ksw fits every workflow.</p>
+    <p class="section-sub">From interactive navigation to AI natural language, ksw fits every workflow.</p>
 
     <div class="usage-grid stagger">
       <div class="usage-card" style="border-color: rgba(0,212,255,.3); grid-column: 1 / -1;">
@@ -696,11 +723,13 @@
         <div class="usage-card-body">
           <div><span class="cmd">$ ksw ai "switch to payments dev"</span></div>
           <div><span class="out">✔ Switched to arn:.../eks-payments-dev</span></div>
-          <div><span class="cmd">$ ksw ai "pin nequi dev and create a group called fintech with nequi and sufi"</span></div>
+          <div><span class="cmd">$ ksw ai "pin nequi dev and create a group called fintech"</span></div>
           <div><span class="out">✔ Pinned ★ arn:.../eks-nequi-dev</span></div>
           <div><span class="out">✔ Group 'fintech' created (4 contexts)</span></div>
           <div><span class="cmd">$ ksw ai "go back to the previous one"</span></div>
           <div><span class="out">✔ Switched to arn:.../eks-sufi-qa</span></div>
+          <div><span class="cmd">$ ksw ai "list my pins and groups as a table"</span></div>
+          <div><span class="t-normal">🤖 AI builds a formatted table from your current state</span></div>
           <div><span class="cmd">$ ksw ai config</span> <span class="cmt"># Setup wizard: provider, model, credentials</span></div>
         </div>
       </div>
@@ -818,7 +847,6 @@
     });
   }, { threshold: 0.1 });
 
-  // Add reveal class to elements and observe them
   document.querySelectorAll('.feature-card, .usage-card, .install-step').forEach(el => {
     el.classList.add('reveal');
     observer.observe(el);
@@ -876,7 +904,178 @@
       }, 1500);
     });
   }
+  // ── Terminal typing animations ──
+  const allContexts = [
+    { name: 'eks-payments-dev', active: true },
+    { name: 'eks-payments-qa', active: false },
+    { name: 'eks-payments-pdn', active: false },
+    { name: 'eks-orders-dev', active: false },
+    { name: 'eks-orders-qa', active: false },
+    { name: 'eks-nequi-dev', active: false },
+    { name: 'eks-sufi-qa', active: false },
+    { name: 'eks-clientes-dev', active: false },
+  ];
+
+  function renderTuiList(filter, cursor) {
+    const list = document.getElementById('tui-list');
+    const counter = document.getElementById('tui-counter');
+    const filtered = filter
+      ? allContexts.filter(c => c.name.includes(filter))
+      : allContexts;
+    let html = '';
+    filtered.forEach((c, i) => {
+      const pointer = i === cursor ? ' ❯ ' : '   ';
+      const pClass = i === cursor ? 't-cursor' : (c.active ? 't-active' : 't-normal');
+      const dot = c.active ? ' <span class="t-dot">●</span>' : '';
+      html += '<div><span class="' + (i === cursor ? 't-pointer' : 't-normal') + '">' + pointer + '</span><span class="' + pClass + '">' + c.name + '</span>' + dot + '</div>';
+    });
+    list.innerHTML = html;
+    counter.innerHTML = '  ' + filtered.length + '/' + allContexts.length;
+  }
+
+  function animateTui() {
+    // Restore TUI structure
+    const body = document.getElementById('tui-body');
+    body.innerHTML = '<div><span class="t-current">  current </span><span class="t-val">eks-payments-dev</span></div>'
+      + '<div>&nbsp;</div>'
+      + '<div><span class="t-search">  ❯ <span id="tui-search">█</span></span></div>'
+      + '<div><span class="t-dim">  ──────────────────────────────────────────</span></div>'
+      + '<div id="tui-list"></div>'
+      + '<div>&nbsp;</div>'
+      + '<div><span class="t-counter" id="tui-counter">  42/42</span><span class="t-help">  ↑↓ navigate · enter select · ctrl+p pin</span></div>';
+
+    const searchEl = document.getElementById('tui-search');
+    const word = 'payments';
+    let i = 0;
+    renderTuiList('', 0);
+    searchEl.textContent = '█';
+
+    function typeNext() {
+      if (i <= word.length) {
+        const typed = word.slice(0, i);
+        searchEl.textContent = typed + '█';
+        renderTuiList(typed, 0);
+        i++;
+        setTimeout(typeNext, 150);
+      } else {
+        // Pause, then simulate Enter — exit TUI, back to shell
+        setTimeout(() => {
+          body.innerHTML = '<div><span class="out">✔ Switched to arn:.../eks-payments-dev</span></div>'
+            + '<div>&nbsp;</div>'
+            + '<div><span class="cmd" id="tui-kubectl"></span></div>'
+            + '<div id="tui-pods"></div>';
+          // Type kubectl command
+          const kubectlEl = document.getElementById('tui-kubectl');
+          const kubecmd = '$ kubectl get pods -n ksw';
+          let ki = 0;
+          function typeKube() {
+            if (ki <= kubecmd.length) {
+              kubectlEl.textContent = kubecmd.slice(0, ki) + (ki < kubecmd.length ? '█' : '');
+              ki++;
+              setTimeout(typeKube, 35);
+            } else {
+              kubectlEl.textContent = kubecmd;
+              setTimeout(() => {
+                document.getElementById('tui-pods').innerHTML =
+                  '<div><span class="t-normal">NAME                        READY   STATUS    RESTARTS   AGE</span></div>'
+                  + '<div><span class="out">ksw-api-7d4b8c6f5-x2k9m    1/1     Running   0          3d</span></div>'
+                  + '<div><span class="out">ksw-worker-5f9a8b7c4-p8n2   1/1     Running   0          3d</span></div>'
+                  + '<div><span class="out">ksw-redis-6c8d9e5f3-q4w7    1/1     Running   0          5d</span></div>';
+              }, 400);
+            }
+          }
+          setTimeout(typeKube, 800);
+        }, 800);
+      }
+    }
+    setTimeout(typeNext, 600);
+  }
+
+  const aiSteps = [
+    { type: 'cmd', text: '$ ksw ai "switch to payments dev"' },
+    { type: 'out', text: '✔ Switched to arn:.../eks-payments-dev' },
+    { type: 'blank' },
+    { type: 'cmd', text: '$ ksw ai "create a group called backend with payments and orders"' },
+    { type: 'out', text: '✔ Group \'backend\' created (4 contexts)' },
+    { type: 'blank' },
+    { type: 'cmd', text: '$ ksw ai "now switch to the same but in qa"' },
+    { type: 'out', text: '✔ Switched to arn:.../eks-payments-qa' },
+  ];
+
+  function animateAi() {
+    const body = document.getElementById('ai-body');
+    body.innerHTML = '';
+    let step = 0;
+
+    function nextStep() {
+      if (step >= aiSteps.length) return;
+      const s = aiSteps[step];
+      if (s.type === 'blank') {
+        body.innerHTML += '<div>&nbsp;</div>';
+        step++;
+        setTimeout(nextStep, 200);
+      } else if (s.type === 'cmd') {
+        const div = document.createElement('div');
+        const span = document.createElement('span');
+        span.className = 'cmd';
+        div.appendChild(span);
+        body.appendChild(div);
+        let ci = 0;
+        function typeChar() {
+          if (ci <= s.text.length) {
+            span.textContent = s.text.slice(0, ci) + (ci < s.text.length ? '█' : '');
+            ci++;
+            setTimeout(typeChar, 30);
+          } else {
+            span.textContent = s.text;
+            step++;
+            setTimeout(nextStep, 300);
+          }
+        }
+        typeChar();
+      } else if (s.type === 'out') {
+        const div = document.createElement('div');
+        div.innerHTML = '<span class="out">' + s.text + '</span>';
+        div.style.opacity = '0';
+        div.style.transition = 'opacity 0.3s ease';
+        body.appendChild(div);
+        setTimeout(() => { div.style.opacity = '1'; }, 50);
+        step++;
+        setTimeout(nextStep, 600);
+      }
+    }
+    setTimeout(nextStep, 400);
+  }
+
+  // ── Slide control ──
+  let showingAI = false;
+  let slideTimer;
+
+  function showTerminal(showAI) {
+    showingAI = showAI;
+    const inner = document.getElementById('term-slide-inner');
+    const tabTui = document.getElementById('tab-tui');
+    const tabAi = document.getElementById('tab-ai');
+    if (showAI) {
+      inner.classList.add('show-ai');
+      tabTui.classList.remove('active');
+      tabAi.classList.add('active');
+      animateAi();
+    } else {
+      inner.classList.remove('show-ai');
+      tabAi.classList.remove('active');
+      tabTui.classList.add('active');
+      animateTui();
+    }
+    clearInterval(slideTimer);
+    slideTimer = setInterval(() => { showTerminal(!showingAI); }, 10000);
+  }
+
+  // Start with TUI
+  animateTui();
+  slideTimer = setInterval(() => { showTerminal(!showingAI); }, 10000);
 </script>
 
 </body>
 </html>
+span>
