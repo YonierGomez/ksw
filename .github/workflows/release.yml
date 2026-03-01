@@ -55,25 +55,25 @@ jobs:
 
             ### One-line installer (macOS & Linux — easiest)
             ```bash
-            curl -sL https://raw.githubusercontent.com/YonierGomez/kswitch/main/install.sh | bash
+            curl -sL https://raw.githubusercontent.com/YonierGomez/ksw/main/install.sh | bash
             ```
             Automatically detects your OS and architecture (amd64/arm64).
 
             ### Homebrew (macOS / Linux)
             ```bash
-            brew tap YonierGomez/kswitch
-            brew install kswitch
+            brew tap YonierGomez/ksw
+            brew install ksw
             ```
 
             ### Manual (Linux)
             ```bash
             # amd64
-            curl -sL https://github.com/YonierGomez/kswitch/releases/download/${{ steps.version.outputs.VERSION }}/ksw-linux-amd64.tar.gz | tar xz
+            curl -sL https://github.com/YonierGomez/ksw/releases/download/${{ steps.version.outputs.VERSION }}/ksw-linux-amd64.tar.gz | tar xz
             chmod +x ksw-linux-amd64
             sudo mv ksw-linux-amd64 /usr/local/bin/ksw
 
             # arm64
-            curl -sL https://github.com/YonierGomez/kswitch/releases/download/${{ steps.version.outputs.VERSION }}/ksw-linux-arm64.tar.gz | tar xz
+            curl -sL https://github.com/YonierGomez/ksw/releases/download/${{ steps.version.outputs.VERSION }}/ksw-linux-arm64.tar.gz | tar xz
             chmod +x ksw-linux-arm64
             sudo mv ksw-linux-arm64 /usr/local/bin/ksw
             ```
@@ -81,12 +81,12 @@ jobs:
             ### Manual (macOS)
             ```bash
             # Apple Silicon (M1/M2/M3)
-            curl -sL https://github.com/YonierGomez/kswitch/releases/download/${{ steps.version.outputs.VERSION }}/ksw-darwin-arm64.tar.gz | tar xz
+            curl -sL https://github.com/YonierGomez/ksw/releases/download/${{ steps.version.outputs.VERSION }}/ksw-darwin-arm64.tar.gz | tar xz
             chmod +x ksw-darwin-arm64
             sudo mv ksw-darwin-arm64 /usr/local/bin/ksw
 
             # Intel
-            curl -sL https://github.com/YonierGomez/kswitch/releases/download/${{ steps.version.outputs.VERSION }}/ksw-darwin-amd64.tar.gz | tar xz
+            curl -sL https://github.com/YonierGomez/ksw/releases/download/${{ steps.version.outputs.VERSION }}/ksw-darwin-amd64.tar.gz | tar xz
             chmod +x ksw-darwin-amd64
             sudo mv ksw-darwin-amd64 /usr/local/bin/ksw
             ```

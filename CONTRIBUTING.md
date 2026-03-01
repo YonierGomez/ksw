@@ -9,11 +9,11 @@ Complete reference for building, releasing, and maintaining the project.
 | Item | Value |
 |------|-------|
 | Binary name | `ksw` |
-| Repo | `github.com/YonierGomez/kswitch` |
+| Repo | `github.com/YonierGomez/ksw` |
 | Language | Go |
 | Landing page | `index.html` (served via GitHub Pages on `main`) |
 | Config file | `~/.ksw.json` |
-| Homebrew tap | `github.com/YonierGomez/homebrew-kswitch` |
+| Homebrew tap | `github.com/YonierGomez/homebrew-ksw` |
 
 ---
 
@@ -28,15 +28,15 @@ Complete reference for building, releasing, and maintaining the project.
 ├── README.md                # User-facing documentation
 ├── CONTRIBUTING.md          # This file
 ├── Formula/
-│   └── kswitch.rb           # Homebrew formula (local copy — NOT the tap)
+│   └── ksw.rb               # Homebrew formula (local copy — NOT the tap)
 └── .github/
     └── workflows/
         └── release.yml      # GitHub Actions: build + release on tag push
 ```
 
 > **Note:** The actual Homebrew tap is a separate repo:
-> `git@github.com:YonierGomez/homebrew-kswitch.git`
-> Local path: `/opt/homebrew/Library/Taps/yoniergomez/homebrew-kswitch/`
+> `git@github.com:YonierGomez/homebrew-ksw.git`
+> Local path: `/opt/homebrew/Library/Taps/yoniergomez/homebrew-ksw/`
 
 ---
 
@@ -86,7 +86,7 @@ git push origin feat/my-feature
 
 ### 2. Open a PR and merge
 
-Open PR at: `https://github.com/YonierGomez/kswitch/pull/new/<branch-name>`
+Open PR at: `https://github.com/YonierGomez/ksw/pull/new/<branch-name>`
 
 ### 3. Bump the version
 
@@ -122,7 +122,7 @@ git push origin v1.1.4
 
 ### 5. Verify the release
 
-Check the workflow at: `https://github.com/YonierGomez/kswitch/actions`
+Check the workflow at: `https://github.com/YonierGomez/ksw/actions`
 
 The workflow builds 4 binaries + tarballs + checksums.txt and creates a GitHub Release.
 
@@ -133,17 +133,17 @@ The workflow builds 4 binaries + tarballs + checksums.txt and creates a GitHub R
 After the release is published, get the new sha256:
 
 ```bash
-curl -sL https://github.com/YonierGomez/kswitch/archive/refs/tags/v1.1.4.tar.gz | shasum -a 256
+curl -sL https://github.com/YonierGomez/ksw/archive/refs/tags/v1.1.4.tar.gz | shasum -a 256
 ```
 
 Then update the tap formula:
 
 ```bash
-cd /opt/homebrew/Library/Taps/yoniergomez/homebrew-kswitch
-# Edit Formula/kswitch.rb:
+cd /opt/homebrew/Library/Taps/yoniergomez/homebrew-ksw
+# Edit Formula/ksw.rb:
 #   url  → new tag URL
 #   sha256 → new hash
-git add Formula/kswitch.rb
+git add Formula/ksw.rb
 git commit -m "fix: update formula for v1.1.4"
 git push origin HEAD
 ```
@@ -151,16 +151,16 @@ git push origin HEAD
 Also update the local copy in this repo:
 
 ```bash
-cp /opt/homebrew/Library/Taps/yoniergomez/homebrew-kswitch/Formula/kswitch.rb Formula/kswitch.rb
-git add Formula/kswitch.rb
-git commit -m "chore: sync Formula/kswitch.rb for v1.1.4"
+cp /opt/homebrew/Library/Taps/yoniergomez/homebrew-ksw/Formula/ksw.rb Formula/ksw.rb
+git add Formula/ksw.rb
+git commit -m "chore: sync Formula/ksw.rb for v1.1.4"
 # include in a PR
 ```
 
 Test the update:
 
 ```bash
-brew update && brew upgrade kswitch
+brew update && brew upgrade ksw
 ksw -v  # should show new version
 ```
 
@@ -216,7 +216,7 @@ File: `.github/workflows/release.yml`
 ## Landing Page (index.html)
 
 - Served via GitHub Pages from `main` branch
-- URL: `https://yoniergomez.github.io/kswitch/`
+- URL: `https://yoniergomez.github.io/ksw/`
 - Single HTML file with inline CSS and JS — no build step needed
 - Version badge in hero section is hardcoded — update it when releasing
 
@@ -235,7 +235,7 @@ grep -n "v1.1" index.html
 One-line installer that auto-detects OS and architecture:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/YonierGomez/kswitch/main/install.sh | bash
+curl -sL https://raw.githubusercontent.com/YonierGomez/ksw/main/install.sh | bash
 ```
 
 The script:
@@ -252,8 +252,8 @@ The script:
 |------|---------------|
 | `main.go` | `const version = "x.x.x"` |
 | `index.html` | Version badge in hero (`v1.1.x`) and structured data |
-| `Formula/kswitch.rb` | `url` and `sha256` |
-| Tap repo `Formula/kswitch.rb` | Same as above |
+| `Formula/ksw.rb` | `url` and `sha256` |
+| Tap repo `Formula/ksw.rb` | Same as above |
 | `.github/workflows/release.yml` | Release body (if install instructions change) |
 
 ---

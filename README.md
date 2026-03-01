@@ -4,7 +4,7 @@
 
 Switch contexts with natural language, manage groups, pins and aliases — all by just telling the AI what you need. Or use the blazing-fast interactive TUI with fuzzy search. Single binary, no runtime dependencies.
 
-> Available for **macOS** and **Linux** (amd64 & arm64). Named `ksw` to avoid conflict with macOS built-in `kswitch` (Kerberos).
+> Available for **macOS** and **Linux** (amd64 & arm64).
 
 ## 🤖 AI — Natural Language Context Management
 
@@ -81,7 +81,7 @@ ksw ai config
 ### One-line installer (macOS & Linux — easiest)
 
 ```bash
-curl -sL https://raw.githubusercontent.com/YonierGomez/kswitch/main/install.sh | bash
+curl -sL https://raw.githubusercontent.com/YonierGomez/ksw/main/install.sh | bash
 ```
 
 Automatically detects your OS and architecture (amd64/arm64) and installs to `/usr/local/bin`.
@@ -89,20 +89,20 @@ Automatically detects your OS and architecture (amd64/arm64) and installs to `/u
 ### Homebrew (macOS & Linux)
 
 ```bash
-brew tap YonierGomez/kswitch
-brew install kswitch
+brew tap YonierGomez/ksw
+brew install ksw
 ```
 
 ### Manual — Linux
 
 ```bash
 # amd64 (x86_64)
-curl -sL https://github.com/YonierGomez/kswitch/releases/latest/download/ksw-linux-amd64.tar.gz | tar xz
+curl -sL https://github.com/YonierGomez/ksw/releases/latest/download/ksw-linux-amd64.tar.gz | tar xz
 chmod +x ksw-linux-amd64
 sudo mv ksw-linux-amd64 /usr/local/bin/ksw
 
 # arm64 (AWS Graviton, Raspberry Pi, etc.)
-curl -sL https://github.com/YonierGomez/kswitch/releases/latest/download/ksw-linux-arm64.tar.gz | tar xz
+curl -sL https://github.com/YonierGomez/ksw/releases/latest/download/ksw-linux-arm64.tar.gz | tar xz
 chmod +x ksw-linux-arm64
 sudo mv ksw-linux-arm64 /usr/local/bin/ksw
 ```
@@ -111,12 +111,12 @@ sudo mv ksw-linux-arm64 /usr/local/bin/ksw
 
 ```bash
 # Apple Silicon (M1/M2/M3)
-curl -sL https://github.com/YonierGomez/kswitch/releases/latest/download/ksw-darwin-arm64.tar.gz | tar xz
+curl -sL https://github.com/YonierGomez/ksw/releases/latest/download/ksw-darwin-arm64.tar.gz | tar xz
 chmod +x ksw-darwin-arm64
 sudo mv ksw-darwin-arm64 /usr/local/bin/ksw
 
 # Intel
-curl -sL https://github.com/YonierGomez/kswitch/releases/latest/download/ksw-darwin-amd64.tar.gz | tar xz
+curl -sL https://github.com/YonierGomez/ksw/releases/latest/download/ksw-darwin-amd64.tar.gz | tar xz
 chmod +x ksw-darwin-amd64
 sudo mv ksw-darwin-amd64 /usr/local/bin/ksw
 ```
@@ -124,7 +124,7 @@ sudo mv ksw-darwin-amd64 /usr/local/bin/ksw
 ### From source
 
 ```bash
-go install github.com/YonierGomez/kswitch@latest
+go install github.com/YonierGomez/ksw@latest
 ```
 
 ## Usage

@@ -1,10 +1,10 @@
 #!/bin/sh
-# ksw installer — https://github.com/YonierGomez/kswitch
-# Usage: curl -sL https://raw.githubusercontent.com/YonierGomez/kswitch/main/install.sh | bash
+# ksw installer — https://github.com/YonierGomez/ksw
+# Usage: curl -sL https://raw.githubusercontent.com/YonierGomez/ksw/main/install.sh | bash
 
 set -e
 
-REPO="YonierGomez/kswitch"
+REPO="YonierGomez/ksw"
 BINARY="ksw"
 INSTALL_DIR="/usr/local/bin"
 

@@ -1,4 +1,4 @@
-module github.com/YonierGomez/kswitch
+module github.com/YonierGomez/ksw
 
 go 1.25.0
 

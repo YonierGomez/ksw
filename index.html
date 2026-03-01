@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ksw – AI-Powered Kubernetes Context Switcher</title>
   <meta name="description" content="ksw is an AI-powered interactive Kubernetes context switcher. Natural language switching, fuzzy search, pins, aliases, groups, conversational memory — single binary, no dependencies." />
-  <meta name="keywords" content="kubernetes, context switcher, kubectl, kubeconfig, k8s, terminal, TUI, CLI, kswitch, AI, natural language, LLM, OpenAI, Claude, Gemini, Bedrock" />
+  <meta name="keywords" content="kubernetes, context switcher, kubectl, kubeconfig, k8s, terminal, TUI, CLI, ksw, AI, natural language, LLM, OpenAI, Claude, Gemini, Bedrock" />
   <meta name="author" content="Yonier Gómez" />
 
   <!-- Favicon SVG inline -->
@@ -13,10 +13,10 @@
 
   <!-- Open Graph / Social -->
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://yoniergomez.github.io/kswitch/" />
+  <meta property="og:url" content="https://yoniergomez.github.io/ksw/" />
   <meta property="og:title" content="ksw – AI-Powered Kubernetes Context Switcher" />
   <meta property="og:description" content="AI-powered interactive TUI for switching Kubernetes contexts. Natural language, fuzzy search, pins, aliases, groups — single binary." />
-  <meta property="og:image" content="https://yoniergomez.github.io/kswitch/og-image.png" />
+  <meta property="og:image" content="https://yoniergomez.github.io/ksw/og-image.png" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
@@ -24,7 +24,7 @@
   <meta name="twitter:description" content="AI-powered interactive TUI for switching Kubernetes contexts. Natural language, fuzzy search, pins, aliases, groups — single binary." />
 
   <!-- Canonical -->
-  <link rel="canonical" href="https://yoniergomez.github.io/kswitch/" />
+  <link rel="canonical" href="https://yoniergomez.github.io/ksw/" />
 
   <!-- Structured Data -->
   <script type="application/ld+json">
@@ -32,7 +32,7 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "ksw",
-    "alternateName": "kswitch",
+    "alternateName": "ksw",
     "description": "AI-powered interactive Kubernetes context switcher with natural language, fuzzy search, pins, aliases, groups and history.",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "macOS, Linux",
@@ -42,10 +42,10 @@
       "name": "Yonier Gómez",
       "url": "https://www.yonier.com"
     },
-    "url": "https://yoniergomez.github.io/kswitch/",
-    "downloadUrl": "https://github.com/YonierGomez/kswitch/releases",
+    "url": "https://yoniergomez.github.io/ksw/",
+    "downloadUrl": "https://github.com/YonierGomez/ksw/releases",
     "softwareVersion": "1.3.0",
-    "license": "https://github.com/YonierGomez/kswitch/blob/main/LICENSE"
+    "license": "https://github.com/YonierGomez/ksw/blob/main/LICENSE"
   }
   </script>
 
@@ -493,7 +493,7 @@
     <li><a href="#features">Features</a></li>
     <li><a href="#install">Install</a></li>
     <li><a href="#usage">Usage</a></li>
-    <li><a href="https://github.com/YonierGomez/kswitch" target="_blank">GitHub</a></li>
+    <li><a href="https://github.com/YonierGomez/ksw" target="_blank">GitHub</a></li>
   </ul>
   <a href="#install" class="nav-cta">Get Started</a>
 </nav>
@@ -505,7 +505,7 @@
   <p>Talk to your clusters in natural language. Switch contexts, manage groups, pins and aliases — just describe what you need. Powered by OpenAI, Claude, Gemini or AWS Bedrock.</p>
   <div class="hero-actions">
     <a href="#install" class="btn-primary">Install with Homebrew</a>
-    <a href="https://github.com/YonierGomez/kswitch" target="_blank" class="btn-secondary">View on GitHub →</a>
+    <a href="https://github.com/YonierGomez/ksw" target="_blank" class="btn-secondary">View on GitHub →</a>
   </div>
 
   <!-- Terminal demo — AI -->
@@ -543,16 +543,16 @@
     <div class="install-step" style="padding:0; overflow:hidden; gap:0;">
       <div style="display:flex; align-items:center; gap:1rem; padding:.8rem 1.2rem; flex:1;">
         <span class="step-num">1</span>
-        <span><span style="color:var(--gray)">brew tap </span>YonierGomez/kswitch</span>
+        <span><span style="color:var(--gray)">brew tap </span>YonierGomez/ksw</span>
       </div>
-      <button onclick="event.stopPropagation(); copyCmd(this,'brew tap YonierGomez/kswitch')" title="Copy" style="flex-shrink:0; background:var(--bg2); border:none; border-left:1px solid var(--border); cursor:pointer; color:var(--gray); font-size:.85rem; padding:.5rem .8rem; transition:color .2s, background .2s; align-self:stretch;">⎘</button>
+      <button onclick="event.stopPropagation(); copyCmd(this,'brew tap YonierGomez/ksw')" title="Copy" style="flex-shrink:0; background:var(--bg2); border:none; border-left:1px solid var(--border); cursor:pointer; color:var(--gray); font-size:.85rem; padding:.5rem .8rem; transition:color .2s, background .2s; align-self:stretch;">⎘</button>
     </div>
     <div class="install-step" style="padding:0; overflow:hidden; gap:0;">
       <div style="display:flex; align-items:center; gap:1rem; padding:.8rem 1.2rem; flex:1;">
         <span class="step-num">2</span>
-        <span><span style="color:var(--gray)">brew install </span>kswitch</span>
+        <span><span style="color:var(--gray)">brew install </span>ksw</span>
       </div>
-      <button onclick="event.stopPropagation(); copyCmd(this,'brew install kswitch')" title="Copy" style="flex-shrink:0; background:var(--bg2); border:none; border-left:1px solid var(--border); cursor:pointer; color:var(--gray); font-size:.85rem; padding:.5rem .8rem; transition:color .2s, background .2s; align-self:stretch;">⎘</button>
+      <button onclick="event.stopPropagation(); copyCmd(this,'brew install ksw')" title="Copy" style="flex-shrink:0; background:var(--bg2); border:none; border-left:1px solid var(--border); cursor:pointer; color:var(--gray); font-size:.85rem; padding:.5rem .8rem; transition:color .2s, background .2s; align-self:stretch;">⎘</button>
     </div>
     <div class="install-step" style="padding:0; overflow:hidden; gap:0;">
       <div style="display:flex; align-items:center; gap:1rem; padding:.8rem 1.2rem; flex:1;">
@@ -564,7 +564,7 @@
   </div>
 
   <p style="margin-top:2rem; color: var(--gray); font-size:.85rem;">
-    To upgrade: <code style="color:var(--cyan); font-family:'JetBrains Mono',monospace;">brew upgrade kswitch</code>
+    To upgrade: <code style="color:var(--cyan); font-family:'JetBrains Mono',monospace;">brew upgrade ksw</code>
   </p>
 
   <!-- One-liner -->
@@ -572,13 +572,13 @@
     <p style="color:var(--gray); font-size:.8rem; margin-bottom:.5rem;">Or install with a single command (macOS & Linux):</p>
     <div id="oneliner-box" style="display:flex; align-items:stretch; background:var(--bg3); border:1px solid var(--border); border-radius:8px; overflow:hidden;">
       <div style="overflow-x:auto; white-space:nowrap; padding:.8rem 1.2rem; font-family:'JetBrains Mono',monospace; font-size:.8rem; flex:1;">
-        <span style="color:var(--gray)">curl -sL </span><span style="color:var(--cyan)">https://raw.githubusercontent.com/YonierGomez/kswitch/main/install.sh</span><span style="color:var(--gray)"> | bash</span>
+        <span style="color:var(--gray)">curl -sL </span><span style="color:var(--cyan)">https://raw.githubusercontent.com/YonierGomez/ksw/main/install.sh</span><span style="color:var(--gray)"> | bash</span>
       </div>
       <button id="copy-oneliner" onclick="copyOneliner()" title="Copy to clipboard" style="flex-shrink:0; background:var(--bg2); border:none; border-left:1px solid var(--border); cursor:pointer; color:var(--gray); font-size:.85rem; padding:.5rem .8rem; transition:color .2s, background .2s;">⎘</button>
     </div>
     <p style="color:var(--gray); font-size:.75rem; margin-top:.4rem;">
       Detects your OS and architecture automatically. &nbsp;·&nbsp;
-      <a href="https://github.com/YonierGomez/kswitch/releases" target="_blank" style="color:var(--cyan)">All releases →</a>
+      <a href="https://github.com/YonierGomez/ksw/releases" target="_blank" style="color:var(--cyan)">All releases →</a>
     </p>
   </div>
 </section>
@@ -796,10 +796,10 @@
   <div class="footer-logo">⎈ <span>ksw</span></div>
   <p>AI-Powered Kubernetes context switcher · v1.3.0</p>
   <ul class="footer-links">
-    <li><a href="https://github.com/YonierGomez/kswitch" target="_blank">GitHub</a></li>
-    <li><a href="https://github.com/YonierGomez/kswitch/releases" target="_blank">Releases</a></li>
-    <li><a href="https://github.com/YonierGomez/kswitch/issues" target="_blank">Issues</a></li>
-    <li><a href="https://github.com/YonierGomez/kswitch/blob/main/LICENSE" target="_blank">MIT License</a></li>
+    <li><a href="https://github.com/YonierGomez/ksw" target="_blank">GitHub</a></li>
+    <li><a href="https://github.com/YonierGomez/ksw/releases" target="_blank">Releases</a></li>
+    <li><a href="https://github.com/YonierGomez/ksw/issues" target="_blank">Issues</a></li>
+    <li><a href="https://github.com/YonierGomez/ksw/blob/main/LICENSE" target="_blank">MIT License</a></li>
   </ul>
   <p class="footer-credit">
     Built by <a href="https://www.yonier.com" target="_blank">Yonier Gómez</a>
@@ -862,7 +862,7 @@
 
   // ── Copy one-liner ──
   function copyOneliner() {
-    const cmd = 'curl -sL https://raw.githubusercontent.com/YonierGomez/kswitch/main/install.sh | bash';
+    const cmd = 'curl -sL https://raw.githubusercontent.com/YonierGomez/ksw/main/install.sh | bash';
     navigator.clipboard.writeText(cmd).then(() => {
       const btn = document.getElementById('copy-oneliner');
       const box = document.getElementById('oneliner-box');

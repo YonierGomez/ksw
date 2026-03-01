@@ -1,7 +1,7 @@
-class Kswitch < Formula
+class Ksw < Formula
   desc "AI-powered interactive Kubernetes context switcher"
-  homepage "https://github.com/YonierGomez/kswitch"
-  url "https://github.com/YonierGomez/kswitch/archive/refs/tags/v1.3.0.tar.gz"
+  homepage "https://github.com/YonierGomez/ksw"
+  url "https://github.com/YonierGomez/ksw/archive/refs/tags/v1.3.0.tar.gz"
   sha256 "fda01fdc4c737e8feff804a140ee19407539a1f03c666c7145d5ea66eb6b696c"
   license "MIT"
 
