@@ -476,7 +476,6 @@
     .term-slide-inner {
       display: flex;
       width: 200%;
-      transition: transform 0.5s ease;
     }
     .term-slide-inner.show-ai {
       transform: translateX(-50%);
@@ -514,7 +513,7 @@
 <section class="hero">
   <div class="badge">⎈ v1.3.0 · AI-Powered</div>
   <h1>Switch Kubernetes<br/>contexts <span class="accent">instantly</span></h1>
-  <p>A blazing-fast interactive TUI for navigating Kubernetes contexts. Fuzzy search, pins, aliases, groups, history — now with AI natural language switching. Available for <strong style="color:var(--cyan)">macOS</strong> and <strong style="color:var(--green)">Linux</strong>.</p>
+  <p>A blazing-fast interactive TUI for navigating Kubernetes contexts. Fuzzy search, pins, aliases, groups, history — <span style="color:var(--cyan); font-weight:600;">now with AI natural language switching</span>. Available for <strong style="color:var(--cyan)">macOS</strong> and <strong style="color:var(--green)">Linux</strong>.</p>
   <div class="hero-actions">
     <a href="#install" class="btn-primary">Install with Homebrew</a>
     <a href="https://github.com/YonierGomez/ksw" target="_blank" class="btn-secondary">View on GitHub →</a>
@@ -934,7 +933,6 @@
   }
 
   function animateTui() {
-    // Restore TUI structure
     const body = document.getElementById('tui-body');
     body.innerHTML = '<div><span class="t-current">  current </span><span class="t-val">eks-payments-dev</span></div>'
       + '<div>&nbsp;</div>'
@@ -946,48 +944,70 @@
 
     const searchEl = document.getElementById('tui-search');
     const word = 'payments';
-    let i = 0;
+    let charIdx = 0;
+    let cursor = 0;
     renderTuiList('', 0);
     searchEl.textContent = '█';
 
+    // Phase 1: type "payments" letter by letter
     function typeNext() {
-      if (i <= word.length) {
-        const typed = word.slice(0, i);
+      if (charIdx <= word.length) {
+        const typed = word.slice(0, charIdx);
         searchEl.textContent = typed + '█';
         renderTuiList(typed, 0);
-        i++;
+        charIdx++;
         setTimeout(typeNext, 150);
       } else {
-        // Pause, then simulate Enter — exit TUI, back to shell
-        setTimeout(() => {
-          body.innerHTML = '<div><span class="out">✔ Switched to arn:.../eks-payments-dev</span></div>'
-            + '<div>&nbsp;</div>'
-            + '<div><span class="cmd" id="tui-kubectl"></span></div>'
-            + '<div id="tui-pods"></div>';
-          // Type kubectl command
-          const kubectlEl = document.getElementById('tui-kubectl');
-          const kubecmd = '$ kubectl get pods -n ksw';
-          let ki = 0;
-          function typeKube() {
-            if (ki <= kubecmd.length) {
-              kubectlEl.textContent = kubecmd.slice(0, ki) + (ki < kubecmd.length ? '█' : '');
-              ki++;
-              setTimeout(typeKube, 35);
-            } else {
-              kubectlEl.textContent = kubecmd;
-              setTimeout(() => {
-                document.getElementById('tui-pods').innerHTML =
-                  '<div><span class="t-normal">NAME                        READY   STATUS    RESTARTS   AGE</span></div>'
-                  + '<div><span class="out">ksw-api-7d4b8c6f5-x2k9m    1/1     Running   0          3d</span></div>'
-                  + '<div><span class="out">ksw-worker-5f9a8b7c4-p8n2   1/1     Running   0          3d</span></div>'
-                  + '<div><span class="out">ksw-redis-6c8d9e5f3-q4w7    1/1     Running   0          5d</span></div>';
-              }, 400);
-            }
-          }
-          setTimeout(typeKube, 800);
-        }, 800);
+        // Phase 2: navigate with arrows
+        cursor = 0;
+        setTimeout(navigateDown, 600);
       }
     }
+
+    // Phase 2: move cursor down through filtered results, then select pdn
+    const navSequence = [1, 2]; // move to qa, then pdn (stay there)
+    let navIdx = 0;
+
+    function navigateDown() {
+      if (navIdx < navSequence.length) {
+        cursor = navSequence[navIdx];
+        renderTuiList(word, cursor);
+        navIdx++;
+        setTimeout(navigateDown, 400);
+      } else {
+        // Phase 3: press Enter — exit TUI
+        setTimeout(simulateEnter, 600);
+      }
+    }
+
+    // Phase 3: exit TUI, show switched message, type kubectl
+    function simulateEnter() {
+      body.innerHTML = '<div><span class="out">✔ Switched to arn:.../eks-payments-pdn</span></div>'
+        + '<div>&nbsp;</div>'
+        + '<div><span class="cmd" id="tui-kubectl"></span></div>'
+        + '<div id="tui-pods"></div>';
+      const kubectlEl = document.getElementById('tui-kubectl');
+      const kubecmd = '$ kubectl get pods -n ksw';
+      let ki = 0;
+      function typeKube() {
+        if (ki <= kubecmd.length) {
+          kubectlEl.textContent = kubecmd.slice(0, ki) + (ki < kubecmd.length ? '█' : '');
+          ki++;
+          setTimeout(typeKube, 35);
+        } else {
+          kubectlEl.textContent = kubecmd;
+          setTimeout(() => {
+            document.getElementById('tui-pods').innerHTML =
+              '<div><span class="t-normal">NAME                        READY   STATUS    RESTARTS   AGE</span></div>'
+              + '<div><span class="out">ksw-api-7d4b8c6f5-x2k9m    1/1     Running   0          3d</span></div>'
+              + '<div><span class="out">ksw-worker-5f9a8b7c4-p8n2   1/1     Running   0          3d</span></div>'
+              + '<div><span class="out">ksw-redis-6c8d9e5f3-q4w7    1/1     Running   0          5d</span></div>';
+          }, 400);
+        }
+      }
+      setTimeout(typeKube, 800);
+    }
+
     setTimeout(typeNext, 600);
   }
 
