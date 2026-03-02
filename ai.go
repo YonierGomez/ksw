@@ -1120,7 +1120,9 @@ func runAICommand(command string, args []string, cfg config) {
 		}
 		groupName := args[0]
 		pattern := strings.ToLower(args[1])
-		// Find all contexts matching the pattern
+		// Strip glob chars for substring matching — AI sometimes sends "eks-sufi-*"
+		cleanPattern := strings.TrimRight(strings.TrimLeft(pattern, "*"), "*")
+		// Find all contexts matching the pattern (substring or glob)
 		contexts, err := getContexts()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -1128,7 +1130,8 @@ func runAICommand(command string, args []string, cfg config) {
 		}
 		var members []string
 		for _, ctx := range contexts {
-			if strings.Contains(strings.ToLower(ctx), pattern) {
+			ctxLower := strings.ToLower(ctx)
+			if strings.Contains(ctxLower, cleanPattern) {
 				members = append(members, ctx)
 			}
 		}
@@ -1263,7 +1266,7 @@ func runAICommand(command string, args []string, cfg config) {
 			fmt.Fprintf(os.Stderr, "%s alias add needs name and context\n", warnStyle.Render("✗"))
 			return
 		}
-		aliasName := args[0]
+		aliasName := strings.TrimLeft(args[0], "@")
 		target := args[1]
 		// Resolve short name to full context
 		contexts, _ := getContexts()
@@ -1286,7 +1289,7 @@ func runAICommand(command string, args []string, cfg config) {
 		if len(args) < 1 {
 			return
 		}
-		name := args[0]
+		name := strings.TrimLeft(args[0], "@")
 		if _, ok := cfg.Aliases[name]; !ok {
 			fmt.Fprintf(os.Stderr, "%s Alias '%s' not found\n", warnStyle.Render("✗"), name)
 			return
