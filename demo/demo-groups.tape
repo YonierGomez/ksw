@@ -12,7 +12,13 @@ Set PlaybackSpeed 0.8
 
 Env KUBECONFIG demo/kubeconfig-demo.yaml
 
-Type `ksw group add payments "eks-payments*"`
+Hide
+Type "ksw group rm payments"
+Enter
+Sleep 300ms
+Show
+
+Type "ksw group add payments eks-payments-dev eks-payments-qa eks-payments-pdn"
 Sleep 400ms
 Enter
 Sleep 1200ms
