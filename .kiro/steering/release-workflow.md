@@ -40,6 +40,14 @@ El script hace automáticamente:
 - Homebrew tap: `git@github.com:YonierGomez/homebrew-ksw.git` (en `/opt/homebrew/Library/Taps/yoniergomez/homebrew-ksw`)
 - Landing page: `https://yoniergomez.github.io/ksw/` (se despliega automáticamente desde `main`)
 
+### Después de cada merge
+Siempre volver a `main`, borrar la rama local y quedar limpio:
+
+```bash
+git checkout main && git pull origin main
+git branch -D <rama-mergeada>
+```
+
 ### Reglas importantes
 - Git remote usa SSH (`git@github.com:...`), nunca HTTPS
 - `main` tiene protección — no se puede pushear directo, siempre por PR
