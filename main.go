@@ -694,6 +694,7 @@ Usage:
   ksw completion zsh         Print zsh setup line
   ksw completion bash        Print bash setup line
   ksw ai "<query>"           Switch context using natural language (AI)
+  ksw ai chat                Interactive conversational mode (multi-turn)
   ksw ai config              Configure AI provider (openai, claude, gemini)
   ksw -l                     List contexts (non-interactive)
   ksw -h                     Show this help
