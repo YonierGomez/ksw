@@ -594,143 +594,379 @@ func saveMemory(cfg *config, query, action, result string) {
 
 // ── handleAIConfig ─────────────────────────────────────
 
-func handleAIConfig(cfg config) {
-	providers := []string{"openai", "claude", "gemini", "bedrock"}
+// ── AI Config TUI ───────────────────────────────────────
 
-	fmt.Println(dimStyle.Render("  Configure AI provider for 'ksw ai'"))
-	fmt.Println()
+type configStep int
 
-	fmt.Println("  Select provider:")
-	for i, p := range providers {
-		marker := "  "
-		if p == cfg.AI.Provider {
-			marker = "❯ "
-		}
-		fmt.Printf("  %s%d) %s\n", marker, i+1, p)
-	}
-	fmt.Printf("\n  Provider [1-%d]: ", len(providers))
+const (
+	stepProvider configStep = iota
+	stepAuthMethod
+	stepProfile
+	stepAccessKey
+	stepSecretKey
+	stepRegion
+	stepAPIKey
+	stepModel
+	stepDone
+)
 
-	var choice string
-	fmt.Scanln(&choice)
-	idx := 0
-	for _, c := range choice {
-		if c >= '1' && c <= rune('0'+len(providers)) {
-			idx = int(c-'0') - 1
-		}
-	}
-	cfg.AI.Provider = providers[idx]
+type configModel struct {
+	cfg       config
+	step      configStep
+	cursor    int
+	input     string
+	width     int
+	height    int
+	quitting  bool
+	providers []string
+	authMethods []string
+	models    []string
+	saved     bool
+}
 
-	if cfg.AI.Provider == "bedrock" {
-		// Auth method selection
-		fmt.Println("\n  Authentication method:")
-		fmt.Println("  1) AWS Profile (aws cli / SSO)")
-		fmt.Println("  2) Access Key + Secret Key")
-		fmt.Println("  3) Environment variables (AWS_ACCESS_KEY_ID)")
-		fmt.Printf("\n  Auth method [1-3]: ")
-		var authChoice string
-		fmt.Scanln(&authChoice)
-		switch strings.TrimSpace(authChoice) {
-		case "2":
-			cfg.AI.AWSAuthMethod = "keys"
-			fmt.Printf("  AWS Access Key ID: ")
-			var ak string
-			fmt.Scanln(&ak)
-			ak = strings.TrimSpace(ak)
-			if ak != "" {
-				cfg.AI.AWSAccessKey = ak
+func (m configModel) Init() tea.Cmd {
+	return tea.WindowSize()
+}
+
+func (m configModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
+
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlC:
+			m.quitting = true
+			return m, tea.Quit
+		case tea.KeyEsc:
+			m.quitting = true
+			return m, tea.Quit
+		case tea.KeyUp:
+			if m.isListStep() && m.cursor > 0 {
+				m.cursor--
 			}
-			fmt.Printf("  AWS Secret Access Key: ")
-			var sk string
-			fmt.Scanln(&sk)
-			sk = strings.TrimSpace(sk)
-			if sk != "" {
-				cfg.AI.AWSSecretKey = sk
+			return m, nil
+		case tea.KeyDown:
+			if m.isListStep() {
+				max := m.listLen() - 1
+				if m.cursor < max {
+					m.cursor++
+				}
 			}
-		case "3":
-			cfg.AI.AWSAuthMethod = "env"
-			fmt.Println(dimStyle.Render("  Will use AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN from env"))
-		default:
-			cfg.AI.AWSAuthMethod = "profile"
-			current := cfg.AI.AWSProfile
+			return m, nil
+		case tea.KeyEnter:
+			return m.handleEnter()
+		case tea.KeyBackspace:
+			if m.isInputStep() && len(m.input) > 0 {
+				runes := []rune(m.input)
+				m.input = string(runes[:len(runes)-1])
+			}
+			return m, nil
+		case tea.KeyRunes:
+			if m.isInputStep() {
+				m.input += string(msg.Runes)
+			}
+			return m, nil
+		case tea.KeySpace:
+			if m.isInputStep() {
+				m.input += " "
+			}
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
+func (m configModel) isListStep() bool {
+	return m.step == stepProvider || m.step == stepAuthMethod || m.step == stepModel
+}
+
+func (m configModel) isInputStep() bool {
+	return m.step == stepProfile || m.step == stepAccessKey || m.step == stepSecretKey || m.step == stepRegion || m.step == stepAPIKey
+}
+
+func (m configModel) listLen() int {
+	switch m.step {
+	case stepProvider:
+		return len(m.providers)
+	case stepAuthMethod:
+		return len(m.authMethods)
+	case stepModel:
+		return len(m.models)
+	}
+	return 0
+}
+
+func (m configModel) handleEnter() (tea.Model, tea.Cmd) {
+	switch m.step {
+	case stepProvider:
+		m.cfg.AI.Provider = m.providers[m.cursor]
+		m.models = providerModels[m.cfg.AI.Provider]
+		if m.cfg.AI.Provider == "bedrock" {
+			m.step = stepAuthMethod
+			m.cursor = 0
+		} else {
+			m.step = stepAPIKey
+			m.input = ""
+		}
+		return m, nil
+
+	case stepAuthMethod:
+		switch m.cursor {
+		case 0:
+			m.cfg.AI.AWSAuthMethod = "profile"
+			m.step = stepProfile
+			current := m.cfg.AI.AWSProfile
 			if current == "" {
 				current = "default"
 			}
-			fmt.Printf("  AWS Profile [%s]: ", current)
-			var profile string
-			fmt.Scanln(&profile)
-			profile = strings.TrimSpace(profile)
-			if profile != "" {
-				cfg.AI.AWSProfile = profile
-			} else if cfg.AI.AWSProfile == "" {
-				cfg.AI.AWSProfile = "default"
+			m.input = current
+		case 1:
+			m.cfg.AI.AWSAuthMethod = "keys"
+			m.step = stepAccessKey
+			m.input = ""
+		case 2:
+			m.cfg.AI.AWSAuthMethod = "env"
+			m.step = stepRegion
+			current := m.cfg.AI.AWSRegion
+			if current == "" {
+				current = "us-east-1"
+			}
+			m.input = current
+		}
+		return m, nil
+
+	case stepProfile:
+		val := strings.TrimSpace(m.input)
+		if val != "" {
+			m.cfg.AI.AWSProfile = val
+		} else if m.cfg.AI.AWSProfile == "" {
+			m.cfg.AI.AWSProfile = "default"
+		}
+		m.step = stepRegion
+		current := m.cfg.AI.AWSRegion
+		if current == "" {
+			current = "us-east-1"
+		}
+		m.input = current
+		return m, nil
+
+	case stepAccessKey:
+		val := strings.TrimSpace(m.input)
+		if val != "" {
+			m.cfg.AI.AWSAccessKey = val
+		}
+		m.step = stepSecretKey
+		m.input = ""
+		return m, nil
+
+	case stepSecretKey:
+		val := strings.TrimSpace(m.input)
+		if val != "" {
+			m.cfg.AI.AWSSecretKey = val
+		}
+		m.step = stepRegion
+		current := m.cfg.AI.AWSRegion
+		if current == "" {
+			current = "us-east-1"
+		}
+		m.input = current
+		return m, nil
+
+	case stepRegion:
+		val := strings.TrimSpace(m.input)
+		if val != "" {
+			m.cfg.AI.AWSRegion = val
+		} else if m.cfg.AI.AWSRegion == "" {
+			m.cfg.AI.AWSRegion = "us-east-1"
+		}
+		m.step = stepModel
+		m.cursor = 0
+		currentModel := m.cfg.AI.Model
+		for i, mod := range m.models {
+			if mod == currentModel {
+				m.cursor = i
+				break
+			}
+		}
+		return m, nil
+
+	case stepAPIKey:
+		val := strings.TrimSpace(m.input)
+		if val != "" {
+			m.cfg.AI.APIKey = val
+		}
+		m.step = stepModel
+		m.cursor = 0
+		currentModel := m.cfg.AI.Model
+		for i, mod := range m.models {
+			if mod == currentModel {
+				m.cursor = i
+				break
+			}
+		}
+		return m, nil
+
+	case stepModel:
+		m.cfg.AI.Model = m.models[m.cursor]
+		if err := saveConfig(m.cfg); err != nil {
+			m.saved = false
+		} else {
+			m.saved = true
+		}
+		m.step = stepDone
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+func (m configModel) View() string {
+	if m.quitting || m.width == 0 {
+		return ""
+	}
+
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00d4ff"))
+	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("#555"))
+	sel := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00d4ff"))
+	normal := lipgloss.NewStyle().Foreground(lipgloss.Color("#999"))
+	label := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#bd93f9"))
+	inputSt := lipgloss.NewStyle().Foreground(lipgloss.Color("#50fa7b")).Bold(true)
+	msgStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f8f8f2"))
+	barStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#333"))
+	okStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#50fa7b"))
+
+	w := m.width
+	if w < 20 {
+		w = 60
+	}
+	innerW := w - 4
+	if innerW < 20 {
+		innerW = 56
+	}
+
+	header := "  " + titleStyle.Render("⎈ ksw ai config")
+	topBar := "  " + barStyle.Render(strings.Repeat("─", innerW))
+
+	var lines []string
+
+	switch m.step {
+	case stepProvider:
+		lines = append(lines, "  "+label.Render("Select provider")+"  "+dim.Render("↑↓ navigate · enter select"))
+		lines = append(lines, "")
+		for i, p := range m.providers {
+			if i == m.cursor {
+				lines = append(lines, "  "+sel.Render("❯ "+p))
+			} else {
+				lines = append(lines, "    "+normal.Render(p))
 			}
 		}
 
-		// AWS Region
-		currentRegion := cfg.AI.AWSRegion
-		if currentRegion == "" {
-			currentRegion = "us-east-1"
-		}
-		fmt.Printf("  AWS Region [%s]: ", currentRegion)
-		var region string
-		fmt.Scanln(&region)
-		region = strings.TrimSpace(region)
-		if region != "" {
-			cfg.AI.AWSRegion = region
-		} else if cfg.AI.AWSRegion == "" {
-			cfg.AI.AWSRegion = "us-east-1"
-		}
-	} else {
-		// API Key
-		fmt.Printf("  API Key for %s: ", cfg.AI.Provider)
-		var apiKey string
-		fmt.Scanln(&apiKey)
-		apiKey = strings.TrimSpace(apiKey)
-		if apiKey != "" {
-			cfg.AI.APIKey = apiKey
-		}
-	}
-
-	// Model selection
-	models := providerModels[cfg.AI.Provider]
-	fmt.Printf("\n  Select model for %s:\n", cfg.AI.Provider)
-	currentModel := cfg.AI.Model
-	if currentModel == "" {
-		currentModel = defaultModel(cfg.AI.Provider)
-	}
-	for i, m := range models {
-		marker := "  "
-		if m == currentModel {
-			marker = "❯ "
-		}
-		fmt.Printf("  %s%d) %s\n", marker, i+1, m)
-	}
-	fmt.Printf("\n  Model [1-%d]: ", len(models))
-
-	var modelChoice string
-	fmt.Scanln(&modelChoice)
-	modelIdx := -1
-	for _, c := range modelChoice {
-		if c >= '1' && c <= '9' {
-			n := int(c-'0') - 1
-			if n < len(models) {
-				modelIdx = n
+	case stepAuthMethod:
+		lines = append(lines, "  "+label.Render("Authentication method")+"  "+dim.Render("↑↓ navigate · enter select"))
+		lines = append(lines, "")
+		for i, a := range m.authMethods {
+			if i == m.cursor {
+				lines = append(lines, "  "+sel.Render("❯ "+a))
+			} else {
+				lines = append(lines, "    "+normal.Render(a))
 			}
 		}
-	}
-	if modelIdx >= 0 {
-		cfg.AI.Model = models[modelIdx]
-	} else {
-		cfg.AI.Model = currentModel
+
+	case stepProfile:
+		lines = append(lines, "  "+label.Render("AWS Profile")+"  "+dim.Render("enter to confirm"))
+		lines = append(lines, "")
+		lines = append(lines, "  "+inputSt.Render("› ")+msgStyle.Render(m.input)+dim.Render("▎"))
+
+	case stepAccessKey:
+		lines = append(lines, "  "+label.Render("AWS Access Key ID")+"  "+dim.Render("enter to confirm"))
+		lines = append(lines, "")
+		lines = append(lines, "  "+inputSt.Render("› ")+msgStyle.Render(m.input)+dim.Render("▎"))
+
+	case stepSecretKey:
+		lines = append(lines, "  "+label.Render("AWS Secret Access Key")+"  "+dim.Render("enter to confirm"))
+		lines = append(lines, "")
+		masked := strings.Repeat("•", len(m.input))
+		lines = append(lines, "  "+inputSt.Render("› ")+msgStyle.Render(masked)+dim.Render("▎"))
+
+	case stepRegion:
+		lines = append(lines, "  "+label.Render("AWS Region")+"  "+dim.Render("enter to confirm"))
+		lines = append(lines, "")
+		lines = append(lines, "  "+inputSt.Render("› ")+msgStyle.Render(m.input)+dim.Render("▎"))
+
+	case stepAPIKey:
+		lines = append(lines, "  "+label.Render("API Key for "+m.cfg.AI.Provider)+"  "+dim.Render("enter to confirm"))
+		lines = append(lines, "")
+		masked := strings.Repeat("•", len(m.input))
+		lines = append(lines, "  "+inputSt.Render("› ")+msgStyle.Render(masked)+dim.Render("▎"))
+
+	case stepModel:
+		lines = append(lines, "  "+label.Render("Select model")+"  "+dim.Render("↑↓ navigate · enter select"))
+		lines = append(lines, "")
+		for i, mod := range m.models {
+			if i == m.cursor {
+				lines = append(lines, "  "+sel.Render("❯ "+mod))
+			} else {
+				lines = append(lines, "    "+normal.Render(mod))
+			}
+		}
+
+	case stepDone:
+		if m.saved {
+			lines = append(lines, "  "+okStyle.Render("✔")+" AI configured: "+sel.Render(m.cfg.AI.Provider)+" / "+dim.Render(m.cfg.AI.Model))
+		} else {
+			lines = append(lines, "  "+lipgloss.NewStyle().Foreground(lipgloss.Color("#ff5555")).Render("✗ Error saving config"))
+		}
 	}
 
-	if err := saveConfig(cfg); err != nil {
-		fmt.Fprintf(os.Stderr, "Error saving config: %v\n", err)
+	// Pad
+	availH := m.height - 4
+	if availH < 3 {
+		availH = 3
+	}
+	for len(lines) < availH {
+		lines = append(lines, "")
+	}
+
+	bottomBar := "  " + barStyle.Render(strings.Repeat("─", innerW))
+
+	var b strings.Builder
+	b.WriteString(header + "\n")
+	b.WriteString(topBar + "\n")
+	for _, l := range lines {
+		b.WriteString(l + "\n")
+	}
+	b.WriteString(bottomBar)
+	return b.String()
+}
+
+func handleAIConfig(cfg config) {
+	providers := []string{"openai", "claude", "gemini", "bedrock"}
+	authMethods := []string{"AWS Profile (SSO / cli)", "Access Key + Secret Key", "Environment variables"}
+
+	// Pre-select current provider
+	cursor := 0
+	for i, p := range providers {
+		if p == cfg.AI.Provider {
+			cursor = i
+			break
+		}
+	}
+
+	m := configModel{
+		cfg:         cfg,
+		step:        stepProvider,
+		cursor:      cursor,
+		providers:   providers,
+		authMethods: authMethods,
+	}
+
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-
-	fmt.Printf("\n%s AI configured: %s / %s\n", successStyle.Render("✔"),
-		aliasStyle.Render(cfg.AI.Provider), dimStyle.Render(cfg.AI.Model))
 }
 
 // ── LLM resolution ─────────────────────────────────────
