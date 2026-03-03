@@ -2,7 +2,7 @@ class Ksw < Formula
   desc "AI-powered interactive Kubernetes context switcher"
   homepage "https://github.com/YonierGomez/ksw"
   url "https://github.com/YonierGomez/ksw/archive/refs/tags/v1.3.3.tar.gz"
-  sha256 "7e1455a971a0888b78f0a3f3e2b49530833809e85070d7ed2ea12f56a2a13e2e"
+  sha256 "e7c9f95025b60da676c041619b61565acaf294ae2248632c41c730f8e900d486"
   license "MIT"
 
   depends_on "go" => :build
