@@ -2,7 +2,7 @@
 
 **AI-powered** Kubernetes context switcher for your terminal. Built in Go.
 
-🌐 **[yoniergomez.github.io/ksw](https://yoniergomez.github.io/ksw/)**
+🌐 **[yoniergomez.github.io/ksw](https://yoniergomez.github.io/ksw/)** · [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕-yellow?style=flat-square&logo=buy-me-a-coffee)](https://buymeacoffee.com/yoniergomez) · [![GitHub Sponsors](https://img.shields.io/badge/Sponsor-❤️-ea4aaa?style=flat-square&logo=github-sponsors)](https://github.com/sponsors/YonierGomez)
 
 Switch contexts with natural language, manage groups, pins and aliases — all by just telling the AI what you need. Or use the blazing-fast interactive TUI with fuzzy search. Single binary, no runtime dependencies.
 
@@ -393,3 +393,7 @@ All settings are stored in `~/.ksw.json`:
 ## License
 
 MIT — Built by [Yonier Gómez](https://www.yonier.com) · [GitHub](https://github.com/YonierGomez) · [LinkedIn](https://www.linkedin.com/in/yoniergomez/)
+
+---
+
+If ksw saves you time, consider [buying me a coffee ☕](https://buymeacoffee.com/yoniergomez)
