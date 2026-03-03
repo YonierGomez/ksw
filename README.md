@@ -2,7 +2,16 @@
 
 **AI-powered** Kubernetes context switcher for your terminal. Built in Go.
 
-🌐 **[yoniergomez.github.io/ksw](https://yoniergomez.github.io/ksw/)** · [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕-yellow?style=flat-square&logo=buy-me-a-coffee)](https://buymeacoffee.com/yoniergomez) · [![GitHub Sponsors](https://img.shields.io/badge/Sponsor-❤️-ea4aaa?style=flat-square&logo=github-sponsors)](https://github.com/sponsors/YonierGomez)
+🌐 **[yoniergomez.github.io/ksw](https://yoniergomez.github.io/ksw/)**
+
+[![GitHub release](https://img.shields.io/github/v/release/YonierGomez/ksw?style=flat-square&logo=github)](https://github.com/YonierGomez/ksw/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go)](go.mod)
+[![macOS](https://img.shields.io/badge/macOS-arm64%20%7C%20amd64-black?style=flat-square&logo=apple)](https://github.com/YonierGomez/ksw/releases/latest)
+[![Linux](https://img.shields.io/badge/Linux-arm64%20%7C%20amd64-FCC624?style=flat-square&logo=linux&logoColor=black)](https://github.com/YonierGomez/ksw/releases/latest)
+[![GitHub Stars](https://img.shields.io/github/stars/YonierGomez/ksw?style=flat-square&logo=github)](https://github.com/YonierGomez/ksw/stargazers)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕-yellow?style=flat-square&logo=buy-me-a-coffee)](https://buymeacoffee.com/yoniergomez)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-❤️-ea4aaa?style=flat-square&logo=github-sponsors)](https://github.com/sponsors/YonierGomez)
 
 Switch contexts with natural language, manage groups, pins and aliases — all by just telling the AI what you need. Or use the blazing-fast interactive TUI with fuzzy search. Single binary, no runtime dependencies.
 
@@ -389,6 +398,18 @@ All settings are stored in `~/.ksw.json`:
 
 - `kubectl` installed and configured
 - For `ksw ai` with AWS Bedrock: `aws` CLI installed and configured
+
+## Roadmap
+
+- [ ] `ksw ai` — support for local models (Ollama)
+- [ ] `ksw diff` — compare two contexts side by side
+- [ ] `ksw export` — export pins, aliases and groups to share across machines
+- [ ] `ksw import` — import a shared config
+- [ ] Namespace switching within a context
+- [ ] Shell prompt integration (show current context in PS1/starship)
+- [ ] `ksw ai` — multi-step workflows ("switch to payments dev and list all pods")
+
+Have an idea? [Open an issue](https://github.com/YonierGomez/ksw/issues/new) or send a PR.
 
 ## License
 
