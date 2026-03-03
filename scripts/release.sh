@@ -126,12 +126,26 @@ echo "✔ Tarball verificado — const version=$TARBALL_VERSION"
 
 BRANCH="chore/bump-$TAG"
 
-# 12. Actualizar Formula/ksw.rb en repo principal
+# 12. Actualizar versión en index.html
+echo "🌐 Actualizando versión en index.html..."
+sed -i '' "s/\"softwareVersion\": \"[0-9]*\.[0-9]*\.[0-9]*\"/\"softwareVersion\": \"$VERSION\"/g" index.html
+sed -i '' "s/⎈ v[0-9]*\.[0-9]*\.[0-9]* · AI-Powered/⎈ v$VERSION · AI-Powered/g" index.html
+sed -i '' "s/AI-Powered Kubernetes context switcher · v[0-9]*\.[0-9]*\.[0-9]*/AI-Powered Kubernetes context switcher · v$VERSION/g" index.html
+
+# Verificar que index.html quedó bien
+HTML_VERSION=$(grep 'softwareVersion' index.html | grep -o '[0-9]*\.[0-9]*\.[0-9]*')
+if [[ "$HTML_VERSION" != "$VERSION" ]]; then
+  echo "❌ index.html no se actualizó correctamente"
+  exit 1
+fi
+echo "✔ index.html actualizado a $VERSION"
+
+# 13. Actualizar Formula/ksw.rb en repo principal
 echo "📝 Actualizando Formula/ksw.rb en ksw..."
 git checkout -b "$BRANCH"
 sed -i '' "s|refs/tags/v[0-9]*\.[0-9]*\.[0-9]*.tar.gz|refs/tags/${TAG}.tar.gz|g" Formula/ksw.rb
 sed -i '' "s|sha256 \"[a-f0-9]*\"|sha256 \"$SHA256\"|g" Formula/ksw.rb
-git add Formula/ksw.rb
+git add Formula/ksw.rb index.html
 git commit -m "chore: bump formula to $TAG"
 git push origin "$BRANCH"
 
