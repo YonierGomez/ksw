@@ -496,7 +496,11 @@ func (m chatModel) View() string {
 	return b.String()
 }
 
+// inChatMode prevents launching nested bubbletea programs from ai chat
+var inChatMode bool
+
 func handleAIChat(cfg config) {
+	inChatMode = true
 	if cfg.AI.Provider == "" {
 		fmt.Fprintf(os.Stderr, "%s AI not configured. Run: ksw ai config\n", warnStyle.Render("✗"))
 		os.Exit(1)
@@ -590,6 +594,45 @@ func saveMemory(cfg *config, query, action, result string) {
 		cfg.AIMemory = cfg.AIMemory[len(cfg.AIMemory)-maxMemory:]
 	}
 	_ = saveConfig(*cfg)
+}
+
+// ── AI available commands (single source of truth) ─────
+
+type aiCmd struct {
+	Name string
+	Args string // empty = no args
+	Desc string
+}
+
+var aiCommands = []aiCmd{
+	{"list", "", "list all contexts"},
+	{"group ls", "", "list groups"},
+	{"group add", `["<name>","<pattern>"]`, "create group matching pattern"},
+	{"group rm", `["<name>","<name2>",...]`, "remove one or more groups"},
+	{"group add-ctx", `["<group>","<context short name>"]`, "add a context to an existing group (creates group if needed)"},
+	{"group use", `["<name>"]`, "open interactive TUI filtered to a group (use when user says tui, interactive, selector, open group)"},
+	{"pin use", "", "open interactive TUI filtered to pinned contexts only"},
+	{"history", "", "show history"},
+	{"history N", "", "switch to history entry N (use command \"history 3\" not args)"},
+	{"alias add", `["<alias>","<context short name>"]`, "create alias"},
+	{"alias rm", `["<alias>"]`, "remove alias"},
+	{"alias ls", "", "list aliases"},
+	{"pin add", `["<context short name>"]`, "pin a context"},
+	{"pin rm", `["<context short name>"]`, "unpin"},
+	{"pin ls", "", "list pins"},
+	{"rename", `["<old>","<new>"]`, "rename a context"},
+}
+
+func aiCommandsPrompt() string {
+	var lines []string
+	for _, c := range aiCommands {
+		if c.Args != "" {
+			lines = append(lines, fmt.Sprintf(`- "%s" args:%s = %s`, c.Name, c.Args, c.Desc))
+		} else {
+			lines = append(lines, fmt.Sprintf(`- "%s" = %s`, c.Name, c.Desc))
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // ── handleAIConfig ─────────────────────────────────────
@@ -1269,20 +1312,7 @@ ACTIONS:
 3. Free reply: {"action":"reply","reply":"<your answer in the user's language>"}
 
 AVAILABLE COMMANDS (these execute real actions):
-- "list" = list all contexts
-- "group ls" = list groups
-- "group add" args:["<name>","<pattern>"] = create group matching pattern
-- "group rm" args:["<name>","<name2>",...] = remove one or more groups
-- "group add-ctx" args:["<group>","<context short name>"] = add a context to an existing group (creates group if needed)
-- "history" = show history
-- "history N" = switch to history entry N (use command "history 3" not args)
-- "alias add" args:["<alias>","<context short name>"] = create alias
-- "alias rm" args:["<alias>"] = remove alias
-- "alias ls" = list aliases
-- "pin add" args:["<context short name>"] = pin a context
-- "pin rm" args:["<context short name>"] = unpin
-- "pin ls" = list pins
-- "rename" args:["<old>","<new>"] = rename a context
+%s
 
 RULES:
 - Abbreviations: "ingti"="ingenieriati", "central"="integracioncentral", "canales"="canales-digitales"
@@ -1304,7 +1334,7 @@ Request: %s
 Contexts:
 %s
 
-JSON:`, currentShort, len(contexts), stateBlock, memoryBlock, query, list)
+JSON:`, currentShort, len(contexts), stateBlock, memoryBlock, aiCommandsPrompt(), query, list)
 }
 
 func preFilterContexts(query string, contexts []string) []string {
@@ -1722,6 +1752,79 @@ func runAICommand(command string, args []string, cfg config) {
 		cfg.Groups[groupName] = append(cfg.Groups[groupName], resolved)
 		_ = saveConfig(cfg)
 		fmt.Printf("%s Added %s to group '%s'\n", successStyle.Render("✔"), shortName(resolved), groupName)
+
+	case "group use":
+		if len(args) < 1 {
+			fmt.Fprintf(os.Stderr, "%s group use needs a group name\n", warnStyle.Render("✗"))
+			return
+		}
+		groupName := args[0]
+		if _, ok := cfg.Groups[groupName]; !ok {
+			fmt.Fprintf(os.Stderr, "%s Group '%s' not found\n", warnStyle.Render("✗"), groupName)
+			return
+		}
+		if inChatMode {
+			fmt.Printf("No puedo abrir el TUI desde el chat. Ejecuta desde tu terminal:\n  ksw group use %s\n", groupName)
+			return
+		}
+		contexts, err := getContexts()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+		current := getCurrentContext()
+		m := initialModel(contexts, current, cfg, groupName, false)
+		p := tea.NewProgram(m, tea.WithAltScreen())
+		result, err := p.Run()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return
+		}
+		final := result.(model)
+		if final.chosen != "" && final.chosen != current {
+			recordHistory(&cfg, current, final.chosen)
+			if err := switchContext(final.chosen); err != nil {
+				fmt.Fprintf(os.Stderr, "Error switching to %s: %v\n", final.chosen, err)
+				return
+			}
+			cfg = final.cfg
+			_ = saveConfig(cfg)
+			fmt.Printf("%s Switched to %s\n", successStyle.Render("✔"), final.chosen)
+		} else if final.chosen == current {
+			fmt.Printf("%s Already on %s\n", dimStyle.Render("·"), current)
+		}
+
+	case "pin use":
+		if inChatMode {
+			fmt.Println("No puedo abrir el TUI desde el chat. Ejecuta desde tu terminal:\n  ksw pin use")
+			return
+		}
+		contexts, err := getContexts()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+		current := getCurrentContext()
+		m := initialModel(contexts, current, cfg, "", true)
+		p := tea.NewProgram(m, tea.WithAltScreen())
+		result, err := p.Run()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return
+		}
+		final := result.(model)
+		if final.chosen != "" && final.chosen != current {
+			recordHistory(&cfg, current, final.chosen)
+			if err := switchContext(final.chosen); err != nil {
+				fmt.Fprintf(os.Stderr, "Error switching to %s: %v\n", final.chosen, err)
+				return
+			}
+			cfg = final.cfg
+			_ = saveConfig(cfg)
+			fmt.Printf("%s Switched to %s\n", successStyle.Render("✔"), final.chosen)
+		} else if final.chosen == current {
+			fmt.Printf("%s Already on %s\n", dimStyle.Render("·"), current)
+		}
 
 	case "rename":
 		if len(args) < 2 {
