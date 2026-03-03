@@ -68,7 +68,6 @@ gh pr create \
 gh pr merge \
   --repo YonierGomez/ksw \
   --squash \
-  --auto \
   "$BRANCH"
 
 # 7. Actualizar formula en homebrew-ksw
@@ -94,7 +93,6 @@ gh pr create \
 gh pr merge \
   --repo YonierGomez/homebrew-ksw \
   --squash \
-  --auto \
   "$BRANCH"
 
 # 9. Actualizar brew local
