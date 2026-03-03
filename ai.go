@@ -11,6 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // ── AI Config ──────────────────────────────────────────
@@ -141,12 +144,17 @@ func handleAI(cfg config) {
 	if len(os.Args) < 3 {
 		fmt.Fprintln(os.Stderr, "Usage: ksw ai \"<query>\"")
 		fmt.Fprintln(os.Stderr, "       ksw ai config")
+		fmt.Fprintln(os.Stderr, "       ksw ai chat")
 		os.Exit(1)
 	}
 
 	sub := os.Args[2]
 	if sub == "config" {
 		handleAIConfig(cfg)
+		return
+	}
+	if sub == "chat" {
+		handleAIChat(cfg)
 		return
 	}
 
@@ -156,7 +164,6 @@ func handleAI(cfg config) {
 		fmt.Fprintf(os.Stderr, "%s AI not configured. Run: ksw ai config\n", warnStyle.Render("✗"))
 		os.Exit(1)
 	}
-	// Bedrock uses AWS creds, others need API key
 	if cfg.AI.Provider != "bedrock" && cfg.AI.APIKey == "" {
 		fmt.Fprintf(os.Stderr, "%s AI not configured. Run: ksw ai config\n", warnStyle.Render("✗"))
 		os.Exit(1)
@@ -172,26 +179,35 @@ func handleAI(cfg config) {
 		os.Exit(1)
 	}
 
-	// Check cache first
-	if cached := loadCache(); cached != nil && strings.EqualFold(cached.Query, query) {
-		executeRawResponse(cached.Response, contexts, &cfg)
-		return
+	runAIQuery(query, contexts, &cfg, false)
+}
+
+// runAIQuery executes a single AI query and updates cfg in place.
+// Returns false if a fatal error occurred.
+func runAIQuery(query string, contexts []string, cfg *config, chatMode bool) bool {
+	// Check cache (only in single-shot mode)
+	if !chatMode {
+		if cached := loadCache(); cached != nil && strings.EqualFold(cached.Query, query) {
+			executeRawResponse(cached.Response, contexts, cfg)
+			return true
+		}
 	}
 
 	done := make(chan struct{})
-	go showSpinner(done)
+	if !chatMode {
+		go showSpinner(done)
+	}
 
 	candidates := preFilterContexts(query, contexts)
 	if len(candidates) == 0 {
 		candidates = contexts
 	}
 
-	chosen, raw, err := resolveContextWithAI(query, candidates, cfg)
+	chosen, raw, err := resolveContextWithAI(query, candidates, *cfg)
 	close(done)
 	time.Sleep(90 * time.Millisecond)
 
-	// Save cache
-	if raw != "" {
+	if raw != "" && !chatMode {
 		saveCache(query, raw)
 	}
 
@@ -199,41 +215,48 @@ func handleAI(cfg config) {
 		if multiErr, ok := err.(*aiMultiError); ok {
 			var results []string
 			for _, act := range multiErr.actions {
-				executeAction(act, contexts, &cfg)
+				executeAction(act, contexts, cfg)
 				results = append(results, act.Action+":"+act.Command+act.Reply)
 			}
-			saveMemory(&cfg, query, "multi", strings.Join(results, " | "))
-			return
+			saveMemory(cfg, query, "multi", strings.Join(results, " | "))
+			return true
 		}
 		if cmdErr, ok := err.(*aiCommandError); ok {
-			saveMemory(&cfg, query, "command", cmdErr.command+" "+strings.Join(cmdErr.args, " "))
-			runAICommand(cmdErr.command, cmdErr.args, cfg)
-			return
+			saveMemory(cfg, query, "command", cmdErr.command+" "+strings.Join(cmdErr.args, " "))
+			runAICommand(cmdErr.command, cmdErr.args, *cfg)
+			*cfg = loadConfig()
+			return true
 		}
 		if replyErr, ok := err.(*aiReplyError); ok {
-			saveMemory(&cfg, query, "reply", replyErr.reply)
-			fmt.Printf("🤖 %s\n", replyErr.reply)
-			return
+			saveMemory(cfg, query, "reply", replyErr.reply)
+			if !chatMode {
+				kswLabel := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#bd93f9")).Render("⎈ ksw ai")
+				fmt.Println(kswLabel)
+				fmt.Printf("%s\n", replyErr.reply)
+			} else {
+				fmt.Printf("%s\n", replyErr.reply)
+			}
+			return true
 		}
 		fmt.Fprintf(os.Stderr, "%s %v\n", warnStyle.Render("✗"), err)
-		os.Exit(1)
+		return false
 	}
 
 	current := getCurrentContext()
 	if chosen == current {
-		saveMemory(&cfg, query, "switch", "already on "+shortName(current))
+		saveMemory(cfg, query, "switch", "already on "+shortName(current))
 		fmt.Printf("%s Already on %s\n", dimStyle.Render("·"), current)
-		return
+		return true
 	}
 
-	recordHistory(&cfg, current, chosen)
+	recordHistory(cfg, current, chosen)
 	if err := switchContext(chosen); err != nil {
 		fmt.Fprintf(os.Stderr, "%s Failed to switch to '%s': %v\n", warnStyle.Render("✗"), chosen, err)
-		os.Exit(1)
+		return false
 	}
 
-	saveMemory(&cfg, query, "switch", shortName(chosen))
-	_ = saveConfig(cfg)
+	saveMemory(cfg, query, "switch", shortName(chosen))
+	_ = saveConfig(*cfg)
 
 	alias := ""
 	for a, target := range cfg.Aliases {
@@ -243,7 +266,275 @@ func handleAI(cfg config) {
 		}
 	}
 	fmt.Printf("%s Switched to %s%s\n", successStyle.Render("✔"), chosen, alias)
+	return true
 }
+
+// handleAIChat runs an interactive conversational chat with the AI.
+
+
+
+
+
+
+
+
+type chatMsg struct {
+	label string
+	text  string
+	time  string
+}
+
+type chatModel struct {
+	cfg       config
+	contexts  []string
+	messages  []chatMsg
+	input     string
+	width     int
+	height    int
+	thinking  bool
+	quitting  bool
+	spinFrame int
+}
+
+type aiResultMsg struct {
+	output string
+}
+
+type spinTickMsg struct{}
+
+func spinTick() tea.Cmd {
+	return tea.Tick(80*time.Millisecond, func(time.Time) tea.Msg {
+		return spinTickMsg{}
+	})
+}
+
+func (m chatModel) Init() tea.Cmd {
+	return tea.WindowSize()
+}
+
+
+func (m chatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
+
+	case spinTickMsg:
+		if m.thinking {
+			m.spinFrame++
+			return m, spinTick()
+		}
+		return m, nil
+
+	case tea.KeyMsg:
+		if m.thinking {
+			return m, nil
+		}
+		switch msg.Type {
+		case tea.KeyCtrlC:
+			m.quitting = true
+			return m, tea.Quit
+		case tea.KeyEnter:
+			query := strings.TrimSpace(m.input)
+			if query == "" {
+				return m, nil
+			}
+			m.input = ""
+			if query == "exit" || query == "quit" || query == "q" {
+				m.quitting = true
+				return m, tea.Quit
+			}
+			if query == "clear" || query == "cls" {
+				m.messages = nil
+				return m, nil
+			}
+			now := time.Now().Format("15:04")
+			m.messages = append(m.messages, chatMsg{label: "user", text: query, time: now})
+			m.thinking = true
+			m.spinFrame = 0
+			aiCmd := func() tea.Msg {
+				oldStdout := os.Stdout
+				r, w, _ := os.Pipe()
+				os.Stdout = w
+				doneCh := make(chan string)
+				go func() {
+					var buf bytes.Buffer
+					io.Copy(&buf, r)
+					doneCh <- buf.String()
+				}()
+				cfg := loadConfig()
+				runAIQuery(query, m.contexts, &cfg, true)
+				w.Close()
+				os.Stdout = oldStdout
+				captured := <-doneCh
+				captured = strings.TrimSpace(captured)
+				// Remove carriage return lines (spinner remnants)
+				var lines []string
+				for _, line := range strings.Split(captured, "\n") {
+					clean := strings.TrimRight(line, " ")
+					if clean != "" {
+						lines = append(lines, line)
+					}
+				}
+				return aiResultMsg{output: strings.Join(lines, "\n")}
+			}
+			return m, tea.Batch(aiCmd, spinTick())
+		case tea.KeyBackspace:
+			if len(m.input) > 0 {
+				runes := []rune(m.input)
+				m.input = string(runes[:len(runes)-1])
+			}
+			return m, nil
+		case tea.KeyRunes:
+			m.input += string(msg.Runes)
+			return m, nil
+		case tea.KeySpace:
+			m.input += " "
+			return m, nil
+		}
+
+	case aiResultMsg:
+		now := time.Now().Format("15:04")
+		m.messages = append(m.messages, chatMsg{label: "ai", text: msg.output, time: now})
+		m.thinking = false
+		m.cfg = loadConfig()
+		return m, nil
+	}
+	return m, nil
+}
+
+
+
+func (m chatModel) View() string {
+	if m.quitting || m.width == 0 {
+		return ""
+	}
+
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00d4ff"))
+	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("#555"))
+	ctxBadge := lipgloss.NewStyle().Foreground(lipgloss.Color("#50fa7b")).Bold(true)
+	youLbl := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00d4ff"))
+	aiLbl := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#bd93f9"))
+	ts := lipgloss.NewStyle().Foreground(lipgloss.Color("#666"))
+	msgStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f8f8f2"))
+	barStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#333"))
+	inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#50fa7b")).Bold(true)
+	thinkStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#bd93f9")).Italic(true)
+
+	w := m.width
+	if w < 20 {
+		w = 60
+	}
+	innerW := w - 4
+	if innerW < 20 {
+		innerW = 56
+	}
+
+	// Header
+	ctx := shortName(getCurrentContext())
+	header := "  " + titleStyle.Render("⎈ ksw ai chat") + dim.Render("  ·  ") + ctxBadge.Render(ctx) + dim.Render("  ·  exit · clear")
+	topBar := "  " + barStyle.Render(strings.Repeat("─", innerW))
+
+	// Messages area
+	var msgLines []string
+	for _, msg := range m.messages {
+		if msg.label == "user" {
+			msgLines = append(msgLines, "  "+youLbl.Render("⎈ you")+" "+ts.Render("· "+msg.time))
+			msgLines = append(msgLines, "  "+msgStyle.Render(msg.text))
+			msgLines = append(msgLines, "")
+		} else {
+			msgLines = append(msgLines, "  "+aiLbl.Render("⎈ ksw ai")+" "+ts.Render("· "+msg.time))
+			for _, line := range strings.Split(msg.text, "\n") {
+				msgLines = append(msgLines, "  "+line)
+			}
+			msgLines = append(msgLines, "")
+		}
+	}
+
+	if m.thinking {
+		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		dots := []string{"", ".", "..", "..."}
+		f := frames[m.spinFrame%len(frames)]
+		d := dots[(m.spinFrame/3)%len(dots)]
+		msgLines = append(msgLines, "  "+thinkStyle.Render(f+" ksw ai thinking"+d))
+		msgLines = append(msgLines, "")
+	}
+
+	// Calculate available height for messages
+	// header(1) + topBar(1) + blank(1) + ... + bottomBar(1) + input(1) = 5 fixed lines
+	availH := m.height - 5
+	if availH < 3 {
+		availH = 3
+	}
+
+	// If messages overflow, show only the last ones
+	if len(msgLines) > availH {
+		msgLines = msgLines[len(msgLines)-availH:]
+	}
+
+	// Pad with empty lines so messages appear at the top
+	for len(msgLines) < availH {
+		msgLines = append(msgLines, "")
+	}
+
+	// Input box
+	bottomBar := "  " + barStyle.Render(strings.Repeat("─", innerW))
+	cursor := "▎"
+	inputLine := "  " + inputStyle.Render("› ") + msgStyle.Render(m.input) + dim.Render(cursor)
+
+	// Assemble
+	var b strings.Builder
+	b.WriteString(header + "\n")
+	b.WriteString(topBar + "\n")
+	for _, l := range msgLines {
+		b.WriteString(l + "\n")
+	}
+	b.WriteString(bottomBar + "\n")
+	b.WriteString(inputLine)
+
+	return b.String()
+}
+
+func handleAIChat(cfg config) {
+	if cfg.AI.Provider == "" {
+		fmt.Fprintf(os.Stderr, "%s AI not configured. Run: ksw ai config\n", warnStyle.Render("✗"))
+		os.Exit(1)
+	}
+	if cfg.AI.Provider != "bedrock" && cfg.AI.APIKey == "" {
+		fmt.Fprintf(os.Stderr, "%s AI not configured. Run: ksw ai config\n", warnStyle.Render("✗"))
+		os.Exit(1)
+	}
+
+	contexts, err := getContexts()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if len(contexts) == 0 {
+		fmt.Fprintln(os.Stderr, "No contexts found in kubeconfig.")
+		os.Exit(1)
+	}
+
+	m := chatModel{
+		cfg:      cfg,
+		contexts: contexts,
+	}
+
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+
+
+
+
+
+
+
 
 // executeAction runs a single AI action
 func executeAction(act aiResponse, contexts []string, cfg *config) {
@@ -271,7 +562,7 @@ func executeAction(act aiResponse, contexts []string, cfg *config) {
 		_ = saveConfig(*cfg)
 		fmt.Printf("%s Switched to %s\n", successStyle.Render("✔"), chosen)
 	case "reply":
-		fmt.Printf("🤖 %s\n", act.Reply)
+		fmt.Printf("%s\n", act.Reply)
 	}
 }
 
@@ -770,6 +1061,7 @@ RULES:
 - Pick the BEST single match for switch. Return short name EXACTLY as listed.
 - Use conversation history to understand references like "the previous one", "same but dev", "go back".
 - Return ONLY valid JSON. No text before or after.
+- FORMATTING: Keep replies concise and conversational. Use simple lists with emojis instead of markdown tables. Avoid ** bold ** markers. Think of your output as a chat message, not a document.
 
 Request: %s
 
@@ -822,7 +1114,7 @@ func showSpinner(done <-chan struct{}) {
 		default:
 			frame := dimStyle.Render(frames[i%len(frames)])
 			d := dots[(i/3)%len(dots)]
-			fmt.Printf("\r%s 🤖 Thinking%s   ", frame, d)
+			fmt.Printf("\r%s ksw ai thinking%s   ", frame, d)
 			i++
 			time.Sleep(80 * time.Millisecond)
 		}

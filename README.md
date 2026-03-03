@@ -151,6 +151,7 @@ go install github.com/YonierGomez/ksw@latest
 ```bash
 # ── AI (natural language) ──
 ksw ai "<query>"             # AI-powered: switch, create, list, delete — anything
+ksw ai chat                  # Interactive conversational mode (multi-turn)
 ksw ai config                # Configure AI provider and credentials
 
 # ── Interactive TUI ──
