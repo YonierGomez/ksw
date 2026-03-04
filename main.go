@@ -14,7 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const version = "1.4.1"
+const version = "1.5.0"
 
 // ── Styles ─────────────────────────────────────────────
 var (
@@ -696,6 +696,8 @@ Usage:
   ksw ai "<query>"           Switch context using natural language (AI)
   ksw ai chat                Interactive conversational mode (multi-turn)
   ksw ai config              Configure AI provider (openai, claude, gemini)
+  ksw eks kubeconfig           Sync EKS clusters to kubeconfig
+  ksw eks kubeconfig --profile <name>  Sync only one AWS profile
   ksw -l                     List contexts (non-interactive)
   ksw -h                     Show this help
   ksw -v                     Show version
@@ -860,6 +862,10 @@ Config stored in ~/.ksw.json
 
 		case "ai":
 			handleAI(cfg)
+			return
+
+		case "eks":
+			handleEks()
 			return
 
 		default:
