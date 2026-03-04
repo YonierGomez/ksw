@@ -621,6 +621,8 @@ var aiCommands = []aiCmd{
 	{"pin rm", `["<context short name>"]`, "unpin"},
 	{"pin ls", "", "list pins"},
 	{"rename", `["<old>","<new>"]`, "rename a context"},
+	{"eks kubeconfig", "", "sync all EKS clusters from all AWS profiles to kubeconfig"},
+	{"eks kubeconfig --profile", `["<profile-name>"]`, "sync EKS clusters from a specific AWS profile to kubeconfig"},
 }
 
 func aiCommandsPrompt() string {
@@ -1979,6 +1981,16 @@ func runAICommand(command string, args []string, cfg config) {
 	case "pin ls":
 		os.Args = []string{"ksw", "pin", "ls"}
 		handlePin(cfg)
+
+	case "eks kubeconfig":
+		handleEksKubeconfig("")
+
+	case "eks kubeconfig --profile":
+		if len(args) < 1 {
+			fmt.Fprintf(os.Stderr, "%s eks kubeconfig --profile needs a profile name\n", warnStyle.Render("✗"))
+			return
+		}
+		handleEksKubeconfig(args[0])
 
 	default:
 		fmt.Fprintf(os.Stderr, "%s Command '%s' not supported via AI yet.\n", warnStyle.Render("?"), command)

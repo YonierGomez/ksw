@@ -185,6 +185,8 @@ ksw alias ls                 # List all aliases
 ksw rename <old> <new>       # Rename a context in kubeconfig
 
 # ── Other ──
+ksw eks kubeconfig           # Sync all EKS clusters to kubeconfig (parallel)
+ksw eks kubeconfig --profile <name>  # Sync only one AWS profile
 ksw completion install       # Auto-install shell completion (~/.zshrc or ~/.bashrc)
 ksw completion zsh           # Print zsh setup line
 ksw completion bash          # Print bash setup line
@@ -360,6 +362,31 @@ ksw rename eks-payments-dev payments-dev
 # ✔ Renamed arn:.../eks-payments-dev → payments-dev
 ```
 
+### EKS Kubeconfig Sync
+
+Automatically discover and add all your EKS clusters to kubeconfig. Reads AWS profiles from `~/.aws/config`, scans for clusters in parallel, detects duplicates, and adds only the missing ones.
+
+```bash
+# Sync all profiles (parallel discovery + parallel write)
+ksw eks kubeconfig
+#  ⎈ ksw eks kubeconfig
+#
+#   Scanning profile 'payments-dev' (us-east-1)... 2 clusters found
+#   Scanning profile 'orders-qa' (us-east-1)... 1 clusters found
+#   ✔ Added: eks-payments-dev (profile: payments-dev)
+#   ✔ Added: eks-payments-qa (profile: payments-dev)
+#   · Skipped: eks-orders-qa (already exists)
+#
+# Done: 2 added, 1 skipped, 0 failed
+
+# Sync only one profile
+ksw eks kubeconfig --profile payments-dev
+
+# Works with AI too
+ksw ai "sync clusters from the payments profile"
+ksw ai "add all my EKS clusters to kubeconfig"
+```
+
 ## Configuration
 
 All settings are stored in `~/.ksw.json`:
@@ -399,9 +426,11 @@ All settings are stored in `~/.ksw.json`:
 
 - `kubectl` installed and configured
 - For `ksw ai` with AWS Bedrock: `aws` CLI installed and configured
+- For `ksw eks kubeconfig`: `aws` CLI installed and configured with profiles in `~/.aws/config`
 
 ## Roadmap
 
+- [ ] `ksw eks kubeconfig` — ~~auto-sync EKS clusters to kubeconfig~~ ✅ **Done in v1.5.0**
 - [ ] `ksw ai` — support for local models (Ollama)
 - [ ] `ksw diff` — compare two contexts side by side
 - [ ] `ksw export` — export pins, aliases and groups to share across machines
