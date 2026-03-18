@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ksw – AI-Powered Kubernetes Context Switcher</title>
-  <meta name="description" content="ksw is an AI-powered interactive Kubernetes context switcher. Natural language switching, fuzzy search, pins, aliases, groups, conversational memory — single binary, no dependencies." />
+  <meta name="description" content="ksw is an AI-powered interactive Kubernetes context switcher with AWS SSO management, EKS kubeconfig sync, natural language switching, fuzzy search, pins, aliases and groups — single binary, no dependencies." />
   <meta name="keywords" content="kubernetes, context switcher, kubectl, kubeconfig, k8s, terminal, TUI, CLI, ksw, AI, natural language, LLM, OpenAI, Claude, Gemini, Bedrock" />
   <meta name="author" content="Yonier Gómez" />
 
@@ -46,7 +46,7 @@
     },
     "url": "https://yoniergomez.github.io/ksw/",
     "downloadUrl": "https://github.com/YonierGomez/ksw/releases",
-    "softwareVersion": "1.5.0",
+    "softwareVersion": "1.6.0",
     "license": "https://github.com/YonierGomez/ksw/blob/main/LICENSE"
   }
   </script>
@@ -602,6 +602,172 @@
       border-radius: 0;
     }
 
+    /* ── PREMIUM SECTION ── */
+    .premium-section {
+      padding: 5rem 2rem;
+      background: linear-gradient(180deg, var(--bg2) 0%, var(--bg) 100%);
+    }
+    .premium-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .premium-badge-label {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      background: rgba(241,250,140,.1);
+      border: 1px solid rgba(241,250,140,.35);
+      color: var(--yellow);
+      padding: .3rem .9rem;
+      border-radius: 999px;
+      font-size: .8rem;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: .8rem;
+    }
+    .premium-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-top: 3rem;
+    }
+    .premium-card {
+      background: linear-gradient(135deg, var(--bg2), rgba(241,250,140,.04));
+      border: 1px solid rgba(241,250,140,.2);
+      border-radius: 12px;
+      padding: 1.8rem;
+      transition: border-color .2s, transform .2s;
+    }
+    .premium-card:hover { border-color: var(--yellow); transform: translateY(-4px); }
+    .premium-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: .5rem; }
+    .premium-card p { color: var(--gray); font-size: .9rem; }
+    .premium-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      background: var(--yellow);
+      color: var(--bg);
+      padding: .75rem 2rem;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 1rem;
+      text-decoration: none;
+      transition: opacity .2s, transform .2s;
+      margin-top: 2.5rem;
+    }
+    .premium-cta:hover { opacity: .85; transform: translateY(-2px); }
+    .license-box {
+      max-width: 560px;
+      margin: 2rem auto 0;
+      background: var(--bg3);
+      border: 1px solid rgba(241,250,140,.2);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .license-box-header {
+      background: rgba(241,250,140,.06);
+      padding: .6rem 1.2rem;
+      font-size: .8rem;
+      color: var(--yellow);
+      font-family: 'JetBrains Mono', monospace;
+      border-bottom: 1px solid rgba(241,250,140,.15);
+    }
+    .license-box-body {
+      padding: 1.1rem 1.4rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .85rem;
+      line-height: 2;
+    }
+
+    /* ── MODALS ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0,0,0,.75);
+      backdrop-filter: blur(6px);
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 680px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 32px 80px rgba(0,0,0,.7);
+      animation: modal-in .25s ease;
+    }
+    @keyframes modal-in {
+      from { opacity: 0; transform: translateY(16px) scale(.97); }
+      to   { opacity: 1; transform: translateY(0)   scale(1); }
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.2rem 1.6rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-header h2 { font-size: 1.1rem; font-weight: 700; color: var(--white); }
+    .modal-header .modal-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .75rem;
+      color: var(--cyan);
+      background: rgba(0,212,255,.1);
+      border: 1px solid rgba(0,212,255,.25);
+      padding: .2rem .6rem;
+      border-radius: 999px;
+      margin-left: .8rem;
+    }
+    .modal-title-row { display: flex; align-items: center; gap: .6rem; }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--gray);
+      font-size: 1.4rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: .2rem .4rem;
+      border-radius: 6px;
+      transition: color .2s, background .2s;
+    }
+    .modal-close:hover { color: var(--white); background: var(--bg3); }
+    .modal-body {
+      overflow-y: auto;
+      padding: 1.6rem;
+      color: var(--light);
+      font-size: .92rem;
+      line-height: 1.75;
+    }
+    .modal-body h3 {
+      color: var(--cyan);
+      font-size: .8rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin: 1.4rem 0 .5rem;
+    }
+    .modal-body h3:first-child { margin-top: 0; }
+    .modal-body p { color: var(--gray); margin-bottom: .6rem; }
+    .modal-body ul { color: var(--gray); padding-left: 1.4rem; margin-bottom: .6rem; }
+    .modal-body ul li { margin-bottom: .3rem; }
+    .modal-body a { color: var(--cyan); text-decoration: none; }
+    .modal-body a:hover { text-decoration: underline; }
+    .modal-footer {
+      padding: 1rem 1.6rem;
+      border-top: 1px solid var(--border);
+      font-size: .8rem;
+      color: #444;
+      text-align: right;
+    }
+
     /* ── RESPONSIVE ── */
     @media (max-width: 640px) {
       .nav-links { display: none; }
@@ -617,6 +783,7 @@
   <ul class="nav-links">
     <li><a href="#features">Features</a></li>
     <li><a href="#ai">AI</a></li>
+    <li><a href="#premium">Premium</a></li>
     <li><a href="#install">Install</a></li>
     <li><a href="#usage">Usage</a></li>
     <li><a href="https://github.com/YonierGomez/ksw" target="_blank">GitHub</a></li>
@@ -626,9 +793,9 @@
 
 <!-- HERO -->
 <section class="hero">
-  <div class="badge">⎈ v1.5.0 · AI-Powered</div>
+  <div class="badge">⎈ v1.6.0 · AI-Powered · AWS SSO</div>
   <h1>Switch Kubernetes<br/>contexts <span class="accent">instantly</span></h1>
-  <p>A blazing-fast interactive TUI for navigating Kubernetes contexts. Fuzzy search, pins, aliases, groups, history — <span style="color:var(--cyan); font-weight:600;">now with AI natural language switching</span>. Available for <strong style="color:var(--cyan)">macOS</strong> and <strong style="color:var(--green)">Linux</strong>.</p>
+  <p>Blazing-fast TUI for Kubernetes contexts with AI natural language, <span style="color:var(--cyan); font-weight:600;">EKS kubeconfig sync</span>, and <span style="color:var(--yellow); font-weight:600;">AWS SSO management</span>. Available for <strong style="color:var(--cyan)">macOS</strong> and <strong style="color:var(--green)">Linux</strong>.</p>
   <div class="hero-actions">
     <a href="#install" class="btn-primary">Install with Homebrew</a>
     <a href="https://github.com/YonierGomez/ksw" target="_blank" class="btn-secondary">View on GitHub →</a>
@@ -829,7 +996,73 @@
     <div class="feature-card" style="border-color: rgba(80,250,123,.3); background: linear-gradient(135deg, var(--bg2), rgba(80,250,123,.05));">
       <div class="feature-icon">☁️</div>
       <h3>EKS Kubeconfig Sync</h3>
-      <p><code style="color:var(--green);font-family:'JetBrains Mono',monospace;">ksw eks kubeconfig</code> reads your AWS profiles, discovers EKS clusters in parallel, and adds missing ones to kubeconfig automatically. Filter by profile with <code style="color:var(--green);font-family:'JetBrains Mono',monospace;">--profile</code>.</p>
+      <p><code style="color:var(--green);font-family:'JetBrains Mono',monospace;">ksw eks kubeconfig sync</code> reads your AWS profiles, discovers clusters in parallel with a live progress bar, and adds missing ones to kubeconfig automatically. Filter by profile with <code style="color:var(--green);font-family:'JetBrains Mono',monospace;">--profile</code>.</p>
+    </div>
+    <div class="feature-card" style="border-color: rgba(80,250,123,.3); background: linear-gradient(135deg, var(--bg2), rgba(80,250,123,.05));">
+      <div class="feature-icon">⎈</div>
+      <h3>EKS TUI</h3>
+      <p><code style="color:var(--green);font-family:'JetBrains Mono',monospace;">ksw eks config</code> opens an interactive manager: sync all profiles, sync a specific profile with live search, view clusters in kubeconfig, remove stale entries, or wipe everything — all with real-time streaming progress.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PREMIUM -->
+<section class="premium-section" id="premium">
+  <div class="premium-inner">
+    <div style="text-align:center;">
+      <div class="premium-badge-label">★ Premium</div>
+      <h2 class="section-title" style="margin-top:.4rem;">AWS SSO — fully integrated</h2>
+      <p class="section-sub">Manage AWS SSO sessions, auto-sync profiles and kubeconfig from a single interactive TUI. Included in the ksw premium license.</p>
+    </div>
+
+    <div class="premium-grid stagger">
+      <div class="premium-card">
+        <div class="feature-icon">🔐</div>
+        <h3>SSO Session Manager</h3>
+        <p><code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">ksw aws sso config</code> — create, edit, delete AWS SSO sessions and see their real-time token status (remaining time, expiry) in an interactive TUI.</p>
+      </div>
+      <div class="premium-card">
+        <div class="feature-icon">🚀</div>
+        <h3>One-Click Login</h3>
+        <p>Login to any SSO session from inside the TUI — <code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">aws sso login</code> runs within the TUI and returns to the menu automatically upon completion.</p>
+      </div>
+      <div class="premium-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Profile Sync</h3>
+        <p>Auto-scan all SSO accounts and roles, then write missing profiles to <code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">~/.aws/config</code> with live streaming progress and a cyan progress bar. Ultra-fast with goroutines.</p>
+      </div>
+      <div class="premium-card">
+        <div class="feature-icon">🗂️</div>
+        <h3>Profile Management</h3>
+        <p>List, add, and search AWS profiles from the command line. <code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">ksw aws sso profiles list</code>, <code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">sync</code>, <code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">search</code> — organized under a clean subcommand tree.</p>
+      </div>
+      <div class="premium-card">
+        <div class="feature-icon">☸️</div>
+        <h3>Kubeconfig Sync from SSO</h3>
+        <p>After syncing profiles, trigger a full kubeconfig sync directly from the SSO TUI — same parallel speed as <code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">ksw eks config</code>, with streaming output and progress bar.</p>
+      </div>
+      <div class="premium-card">
+        <div class="feature-icon">🔒</div>
+        <h3>Secure License</h3>
+        <p>Perpetual license per user. Key is encrypted at rest with AES-GCM and a machine fingerprint. Validated online with a 24h local cache — no slowdowns. Deactivate any time to move machines.</p>
+      </div>
+    </div>
+
+    <div style="text-align:center;">
+      <a href="https://ksw.lemonsqueezy.com/checkout/buy/5b89e2bc-9b58-4343-84d3-2dcbf22d67a1" target="_blank" class="premium-cta">★ Get Premium</a>
+    </div>
+
+    <div class="license-box">
+      <div class="license-box-header">★ activate license</div>
+      <div class="license-box-body">
+        <div><span class="cmd">$ ksw license activate</span></div>
+        <div><span style="color:#555;">  Enter license key: ************************************</span></div>
+        <div><span class="out">  ✔ License activated successfully!</span></div>
+        <div><span style="color:#555;">  Registered to: you@company.com</span></div>
+        <div>&nbsp;</div>
+        <div><span class="out">  ★ All premium features are now unlocked.</span></div>
+        <div><span style="color:#555;">  Get started: ksw aws sso config</span></div>
+      </div>
     </div>
   </div>
 </section>
@@ -941,6 +1174,28 @@
           <div><span class="cmt">  arn:.../eks-orders-dev</span></div>
         </div>
       </div>
+      <div class="usage-card" style="border-color: rgba(0,180,216,.3);">
+        <div class="usage-card-header" style="background: linear-gradient(90deg, var(--bg3), rgba(0,180,216,.08));">⎈ EKS kubeconfig sync</div>
+        <div class="usage-card-body">
+          <div><span class="cmd">$ ksw eks kubeconfig sync</span></div>
+          <div><span style="color:#00b4d8;">  ⠸ Scanning... ████████░░  42 / 80</span></div>
+          <div><span class="out">  ✔ profile 'pay-dev' [us-east-1] — 2 cluster(s) found</span></div>
+          <div><span class="out">  ✔ Added: eks-payments-dev</span></div>
+          <div><span class="cmt">  · Skipped: eks-orders-qa (exists)</span></div>
+          <div><span class="out">  ✔ Done — 3 added, 12 skipped, 0 failed</span></div>
+        </div>
+      </div>
+      <div class="usage-card" style="border-color: rgba(241,250,140,.2);">
+        <div class="usage-card-header" style="background: linear-gradient(90deg, var(--bg3), rgba(241,250,140,.06));">★ AWS SSO profiles sync (premium)</div>
+        <div class="usage-card-body">
+          <div><span class="cmd">$ ksw aws sso profiles sync</span></div>
+          <div><span style="color:var(--yellow);">  ⠸ Syncing... ██████░░░░  64 / 120</span></div>
+          <div><span class="out">  ✔ Added profile 'payments-dev'</span></div>
+          <div><span class="out">  ✔ Added profile 'orders-qa'</span></div>
+          <div><span class="cmt">  · Skipped 'infra-pdn' (up to date)</span></div>
+          <div><span class="out">  ✔ Done — 18 added, 46 skipped</span></div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -948,12 +1203,13 @@
 <!-- FOOTER -->
 <footer>
   <div class="footer-logo">⎈ <span>ksw</span></div>
-  <p>AI-Powered Kubernetes context switcher · v1.5.0</p>
+  <p>AI-Powered Kubernetes context switcher · v1.6.0</p>
   <ul class="footer-links">
     <li><a href="https://github.com/YonierGomez/ksw" target="_blank">GitHub</a></li>
     <li><a href="https://github.com/YonierGomez/ksw/releases" target="_blank">Releases</a></li>
     <li><a href="https://github.com/YonierGomez/ksw/issues" target="_blank">Issues</a></li>
     <li><a href="https://github.com/YonierGomez/ksw/blob/main/LICENSE" target="_blank">MIT License</a></li>
+    <li><a href="https://ksw.lemonsqueezy.com/checkout/buy/5b89e2bc-9b58-4343-84d3-2dcbf22d67a1" target="_blank" style="color:var(--yellow); border-color:rgba(241,250,140,.3);">★ Get Premium</a></li>
     <li><a href="https://buymeacoffee.com/yoniergomez" target="_blank">Buy Me a Coffee</a></li>
     <li><a href="https://github.com/sponsors/YonierGomez" target="_blank">Sponsor</a></li>
     <li><a href="#" onclick="openModal('tos-modal'); return false;">Terms of Service</a></li>
@@ -1118,7 +1374,7 @@
     });
   }, { threshold: 0.1 });
 
-  document.querySelectorAll('.feature-card, .usage-card, .install-step').forEach(el => {
+  document.querySelectorAll('.feature-card, .usage-card, .install-step, .premium-card').forEach(el => {
     el.classList.add('reveal');
     observer.observe(el);
   });
@@ -1396,6 +1652,144 @@
     }
   });
 </script>
+
+<!-- TERMS OF SERVICE MODAL -->
+<div class="modal-overlay" id="tos-modal" onclick="closeModalOnOverlay(event, 'tos-modal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tos-title">
+    <div class="modal-header">
+      <div class="modal-title-row">
+        <h2 id="tos-title">Terms of Service</h2>
+        <span class="modal-tag">v1.0 · March 2026</span>
+      </div>
+      <button class="modal-close" onclick="closeModal('tos-modal')" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <h3>1. Acceptance of Terms</h3>
+      <p>By downloading, installing, or using <strong>ksw</strong> ("the Software"), you agree to be bound by these Terms of Service. If you do not agree, do not use the Software.</p>
+
+      <h3>2. License</h3>
+      <p>ksw core is distributed under the <a href="https://github.com/YonierGomez/ksw/blob/main/LICENSE" target="_blank">MIT License</a>. You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, subject to the conditions stated in that license. Premium features require a valid commercial license purchased via <a href="https://ksw.lemonsqueezy.com/checkout/buy/5b89e2bc-9b58-4343-84d3-2dcbf22d67a1" target="_blank">ksw.lemonsqueezy.com</a>.</p>
+
+      <h3>3. Premium License</h3>
+      <p>A premium license grants a single user perpetual access to premium features on one machine at a time. You may deactivate and reactivate the license to move between machines. Licenses may not be shared, resold, or transferred to another person.</p>
+
+      <h3>4. No Warranty</h3>
+      <p>The Software is provided <strong>"as is"</strong>, without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement. The authors are not liable for any claim, damages, or other liability arising from the use of the Software.</p>
+
+      <h3>5. Acceptable Use</h3>
+      <p>You agree not to use the Software to:</p>
+      <ul>
+        <li>Violate any applicable local, national, or international law or regulation.</li>
+        <li>Gain unauthorized access to third-party systems, clusters, or infrastructure.</li>
+        <li>Circumvent or reverse-engineer the license validation mechanism.</li>
+        <li>Distribute malware or otherwise compromise third-party security.</li>
+      </ul>
+
+      <h3>6. Third-Party Services</h3>
+      <p>The AI features rely on third-party providers (OpenAI, Anthropic, Google, AWS). Your use of those services is subject to their respective terms and privacy policies. ksw does not store or transmit your API keys beyond your local machine. License validation is handled by <a href="https://www.lemonsqueezy.com" target="_blank">Lemon Squeezy</a> and is subject to their terms.</p>
+
+      <h3>7. Changes to the Software</h3>
+      <p>The author reserves the right to modify, suspend, or discontinue the Software at any time without prior notice. The author shall not be liable for any such modification, suspension, or discontinuation.</p>
+
+      <h3>8. Changes to These Terms</h3>
+      <p>These Terms may be updated from time to time. Continued use of the Software after any change constitutes acceptance of the new terms.</p>
+
+      <h3>9. Contact</h3>
+      <p>Questions about these Terms can be directed to <a href="https://github.com/YonierGomez/ksw/issues" target="_blank">GitHub Issues</a> or via <a href="https://www.yonier.com" target="_blank">yonier.com</a>.</p>
+    </div>
+    <div class="modal-footer">Last updated: March 2026 &nbsp;·&nbsp; <a href="https://github.com/YonierGomez/ksw" target="_blank" style="color:var(--cyan)">YonierGomez/ksw</a></div>
+  </div>
+</div>
+
+<!-- REFUND POLICY MODAL -->
+<div class="modal-overlay" id="refund-modal" onclick="closeModalOnOverlay(event, 'refund-modal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="refund-title">
+    <div class="modal-header">
+      <div class="modal-title-row">
+        <h2 id="refund-title">Refund Policy</h2>
+        <span class="modal-tag">v1.0 · March 2026</span>
+      </div>
+      <button class="modal-close" onclick="closeModal('refund-modal')" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <h3>Free &amp; Open-Source Core</h3>
+      <p>The core of ksw is <strong>free and open-source</strong>. No payment is required to use context switching, AI, groups, pins, aliases, EKS sync, or any other free feature.</p>
+
+      <h3>Premium License</h3>
+      <p>The premium license unlocks AWS SSO management features and is sold as a <strong>perpetual, single-user license</strong> via <a href="https://ksw.lemonsqueezy.com/checkout/buy/5b89e2bc-9b58-4343-84d3-2dcbf22d67a1" target="_blank">Lemon Squeezy</a>.</p>
+      <ul>
+        <li>Refunds are available within <strong>7 days</strong> of purchase if the premium features do not work as described. Contact us before requesting a refund so we can attempt to resolve the issue.</li>
+        <li>Refund requests after 7 days will be evaluated on a case-by-case basis.</li>
+        <li>To request a refund, open an issue at <a href="https://github.com/YonierGomez/ksw/issues" target="_blank">GitHub Issues</a> or reach out via <a href="https://www.yonier.com" target="_blank">yonier.com</a> with your order details.</li>
+      </ul>
+
+      <h3>Voluntary Donations</h3>
+      <p>Donations via <a href="https://buymeacoffee.com/yoniergomez" target="_blank">Buy Me a Coffee</a> or <a href="https://github.com/sponsors/YonierGomez" target="_blank">GitHub Sponsors</a> are voluntary gestures of appreciation and are <strong>non-refundable</strong>. If you believe a payment was made in error, contact the respective platform directly.</p>
+
+      <h3>Third-Party API Costs</h3>
+      <p>Using AI features may incur costs from third-party providers (OpenAI, Anthropic, Google, AWS). Those charges are governed by the respective provider's billing and refund policies. The author of ksw has no control over and is not responsible for those costs.</p>
+
+      <h3>Contact</h3>
+      <p>For refund requests, open an issue at <a href="https://github.com/YonierGomez/ksw/issues" target="_blank">GitHub Issues</a> or reach out via <a href="https://www.yonier.com" target="_blank">yonier.com</a>.</p>
+    </div>
+    <div class="modal-footer">Last updated: March 2026 &nbsp;·&nbsp; <a href="https://github.com/YonierGomez/ksw" target="_blank" style="color:var(--cyan)">YonierGomez/ksw</a></div>
+  </div>
+</div>
+
+<!-- PRIVACY POLICY MODAL -->
+<div class="modal-overlay" id="privacy-modal" onclick="closeModalOnOverlay(event, 'privacy-modal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="privacy-title">
+    <div class="modal-header">
+      <div class="modal-title-row">
+        <h2 id="privacy-title">Privacy Policy</h2>
+        <span class="modal-tag">v1.0 · March 2026</span>
+      </div>
+      <button class="modal-close" onclick="closeModal('privacy-modal')" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <h3>Overview</h3>
+      <p>ksw is a local command-line tool. It does <strong>not</strong> have a backend, does not collect telemetry, and does not transmit any personal data to the author or any server controlled by the author.</p>
+
+      <h3>Data Stored Locally</h3>
+      <p>All state is stored exclusively on your machine in <code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">~/.ksw.json</code>, including:</p>
+      <ul>
+        <li>Pinned contexts, aliases, groups, and history.</li>
+        <li>AI provider credentials (API keys) — never sent anywhere except to your chosen AI provider's API.</li>
+        <li>AWS SSO session configuration and profile metadata.</li>
+        <li>Premium license key — stored <strong>encrypted</strong> with AES-GCM using a machine-derived fingerprint. Never transmitted except for online validation with Lemon Squeezy.</li>
+      </ul>
+
+      <h3>License Validation</h3>
+      <p>When validating a premium license, ksw sends the encrypted license key to <a href="https://www.lemonsqueezy.com" target="_blank">Lemon Squeezy's API</a> to confirm it is active. This check is cached locally for 24 hours to minimize network calls. No other personal data is transmitted during validation. Lemon Squeezy's privacy policy governs how they handle that data.</p>
+
+      <h3>Third-Party AI Providers</h3>
+      <p>When you use AI features, your prompts and context metadata (cluster names, aliases, groups) are sent to your configured provider. Each provider has its own privacy policy:</p>
+      <ul>
+        <li><a href="https://openai.com/policies/privacy-policy" target="_blank">OpenAI Privacy Policy</a></li>
+        <li><a href="https://www.anthropic.com/legal/privacy" target="_blank">Anthropic Privacy Policy</a></li>
+        <li><a href="https://policies.google.com/privacy" target="_blank">Google Privacy Policy</a></li>
+        <li><a href="https://aws.amazon.com/privacy/" target="_blank">AWS Privacy Notice</a></li>
+      </ul>
+
+      <h3>Analytics &amp; Tracking</h3>
+      <p>The ksw binary contains <strong>no analytics, tracking, or crash reporting</strong>. No usage data is ever collected or transmitted by the tool.</p>
+      <p>This landing page is hosted on GitHub Pages. GitHub may collect certain request metadata (IP address, referrer) per the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank">GitHub Privacy Statement</a>.</p>
+
+      <h3>Cookies</h3>
+      <p>This website does not use cookies or any client-side tracking technologies.</p>
+
+      <h3>Children's Privacy</h3>
+      <p>ksw is a developer tool not directed at children under 13. We do not knowingly collect information from children.</p>
+
+      <h3>Changes to This Policy</h3>
+      <p>This policy may be updated over time. The latest version is always available on this page. Continued use of the Software after changes constitutes acceptance of the updated policy.</p>
+
+      <h3>Contact</h3>
+      <p>For privacy-related questions, open an issue at <a href="https://github.com/YonierGomez/ksw/issues" target="_blank">GitHub Issues</a> or reach out via <a href="https://www.yonier.com" target="_blank">yonier.com</a>.</p>
+    </div>
+    <div class="modal-footer">Last updated: March 2026 &nbsp;·&nbsp; <a href="https://github.com/YonierGomez/ksw" target="_blank" style="color:var(--cyan)">YonierGomez/ksw</a></div>
+  </div>
+</div>
 
 </body>
 </html>
