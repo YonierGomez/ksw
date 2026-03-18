@@ -440,6 +440,99 @@
     }
     .footer-author-links a:hover { color: var(--cyan); text-decoration: none; }
 
+    /* ── MODALS ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0,0,0,.75);
+      backdrop-filter: blur(6px);
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 680px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 32px 80px rgba(0,0,0,.7);
+      animation: modal-in .25s ease;
+    }
+    @keyframes modal-in {
+      from { opacity: 0; transform: translateY(16px) scale(.97); }
+      to   { opacity: 1; transform: translateY(0)   scale(1); }
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.2rem 1.6rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-header h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--white);
+    }
+    .modal-header .modal-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .75rem;
+      color: var(--cyan);
+      background: rgba(0,212,255,.1);
+      border: 1px solid rgba(0,212,255,.25);
+      padding: .2rem .6rem;
+      border-radius: 999px;
+      margin-left: .8rem;
+    }
+    .modal-title-row { display: flex; align-items: center; gap: .6rem; }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--gray);
+      font-size: 1.4rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: .2rem .4rem;
+      border-radius: 6px;
+      transition: color .2s, background .2s;
+    }
+    .modal-close:hover { color: var(--white); background: var(--bg3); }
+    .modal-body {
+      overflow-y: auto;
+      padding: 1.6rem;
+      color: var(--light);
+      font-size: .92rem;
+      line-height: 1.75;
+    }
+    .modal-body h3 {
+      color: var(--cyan);
+      font-size: .8rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin: 1.4rem 0 .5rem;
+    }
+    .modal-body h3:first-child { margin-top: 0; }
+    .modal-body p { color: var(--gray); margin-bottom: .6rem; }
+    .modal-body ul { color: var(--gray); padding-left: 1.4rem; margin-bottom: .6rem; }
+    .modal-body ul li { margin-bottom: .3rem; }
+    .modal-body a { color: var(--cyan); text-decoration: none; }
+    .modal-body a:hover { text-decoration: underline; }
+    .modal-footer {
+      padding: 1rem 1.6rem;
+      border-top: 1px solid var(--border);
+      font-size: .8rem;
+      color: #444;
+      text-align: right;
+    }
+
     /* ── ANIMATIONS ── */
     .reveal {
       opacity: 0;
@@ -863,6 +956,9 @@
     <li><a href="https://github.com/YonierGomez/ksw/blob/main/LICENSE" target="_blank">MIT License</a></li>
     <li><a href="https://buymeacoffee.com/yoniergomez" target="_blank">Buy Me a Coffee</a></li>
     <li><a href="https://github.com/sponsors/YonierGomez" target="_blank">Sponsor</a></li>
+    <li><a href="#" onclick="openModal('tos-modal'); return false;">Terms of Service</a></li>
+    <li><a href="#" onclick="openModal('refund-modal'); return false;">Refund Policy</a></li>
+    <li><a href="#" onclick="openModal('privacy-modal'); return false;">Privacy Policy</a></li>
   </ul>
   <div class="footer-credit">
     Built by <a href="https://www.yonier.com" target="_blank">Yonier Gómez</a>
@@ -879,6 +975,138 @@
     </span>
   </div>
 </footer>
+
+<!-- TERMS OF SERVICE MODAL -->
+<div class="modal-overlay" id="tos-modal" onclick="closeModalOnOverlay(event, 'tos-modal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tos-title">
+    <div class="modal-header">
+      <div class="modal-title-row">
+        <h2 id="tos-title">Terms of Service</h2>
+        <span class="modal-tag">v1.0 · March 2026</span>
+      </div>
+      <button class="modal-close" onclick="closeModal('tos-modal')" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <h3>1. Acceptance of Terms</h3>
+      <p>By downloading, installing, or using <strong>ksw</strong> ("the Software"), you agree to be bound by these Terms of Service. If you do not agree, do not use the Software.</p>
+
+      <h3>2. License</h3>
+      <p>ksw is distributed under the <a href="https://github.com/YonierGomez/ksw/blob/main/LICENSE" target="_blank">MIT License</a>. You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, subject to the conditions stated in that license.</p>
+
+      <h3>3. No Warranty</h3>
+      <p>The Software is provided <strong>"as is"</strong>, without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement. The authors are not liable for any claim, damages, or other liability arising from the use of the Software.</p>
+
+      <h3>4. Acceptable Use</h3>
+      <p>You agree not to use the Software to:</p>
+      <ul>
+        <li>Violate any applicable local, national, or international law or regulation.</li>
+        <li>Gain unauthorized access to third-party systems, clusters, or infrastructure.</li>
+        <li>Distribute malware or otherwise compromise third-party security.</li>
+      </ul>
+
+      <h3>5. Third-Party Services</h3>
+      <p>The AI features of ksw rely on third-party providers (OpenAI, Anthropic, Google, AWS). Your use of those services is subject to their respective terms and privacy policies. ksw does not store or transmit your API keys beyond your local machine.</p>
+
+      <h3>6. Changes to the Software</h3>
+      <p>The author reserves the right to modify, suspend, or discontinue the Software (or any part of it) at any time without prior notice. The author shall not be liable to you or any third party for any such modification, suspension, or discontinuation.</p>
+
+      <h3>7. Changes to These Terms</h3>
+      <p>These Terms may be updated from time to time. Continued use of the Software after any change constitutes acceptance of the new terms. The latest version is always available in the project repository.</p>
+
+      <h3>8. Contact</h3>
+      <p>Questions about these Terms can be directed to <a href="https://github.com/YonierGomez/ksw/issues" target="_blank">GitHub Issues</a> or via <a href="https://www.yonier.com" target="_blank">yonier.com</a>.</p>
+    </div>
+    <div class="modal-footer">Last updated: March 2026 &nbsp;·&nbsp; <a href="https://github.com/YonierGomez/ksw" target="_blank" style="color:var(--cyan)">YonierGomez/ksw</a></div>
+  </div>
+</div>
+
+<!-- REFUND POLICY MODAL -->
+<div class="modal-overlay" id="refund-modal" onclick="closeModalOnOverlay(event, 'refund-modal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="refund-title">
+    <div class="modal-header">
+      <div class="modal-title-row">
+        <h2 id="refund-title">Refund Policy</h2>
+        <span class="modal-tag">v1.0 · March 2026</span>
+      </div>
+      <button class="modal-close" onclick="closeModal('refund-modal')" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <h3>Free &amp; Open-Source Software</h3>
+      <p>ksw is <strong>free and open-source</strong>. There is no charge to download, install, or use the Software. No payment is required to access any feature.</p>
+
+      <h3>Voluntary Donations</h3>
+      <p>If you choose to support the project through <a href="https://buymeacoffee.com/yoniergomez" target="_blank">Buy Me a Coffee</a> or <a href="https://github.com/sponsors/YonierGomez" target="_blank">GitHub Sponsors</a>, please note:</p>
+      <ul>
+        <li>All donations are <strong>voluntary</strong> and made as a gesture of appreciation.</li>
+        <li>Donations do <strong>not</strong> constitute a purchase of goods or services.</li>
+        <li>Donations are <strong>non-refundable</strong>. Once a donation is processed, it cannot be reversed by the author.</li>
+        <li>If you believe a payment was made in error, please contact the respective platform directly (Buy Me a Coffee or GitHub) for assistance.</li>
+      </ul>
+
+      <h3>No Paid Tiers or Subscriptions</h3>
+      <p>ksw does not offer paid plans, subscriptions, or premium tiers. All features — including AI integration — are available to everyone at no cost.</p>
+
+      <h3>Third-Party API Costs</h3>
+      <p>Using the AI features may incur costs from third-party providers (e.g., OpenAI, Anthropic, Google, AWS) based on your usage. Those charges are governed by the respective provider's billing and refund policies. The author of ksw has no control over and is not responsible for those costs.</p>
+
+      <h3>Contact</h3>
+      <p>If you have questions about donations or payments, open an issue at <a href="https://github.com/YonierGomez/ksw/issues" target="_blank">GitHub Issues</a> or reach out via <a href="https://www.yonier.com" target="_blank">yonier.com</a>.</p>
+    </div>
+    <div class="modal-footer">Last updated: March 2026 &nbsp;·&nbsp; <a href="https://github.com/YonierGomez/ksw" target="_blank" style="color:var(--cyan)">YonierGomez/ksw</a></div>
+  </div>
+</div>
+
+<!-- PRIVACY POLICY MODAL -->
+<div class="modal-overlay" id="privacy-modal" onclick="closeModalOnOverlay(event, 'privacy-modal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="privacy-title">
+    <div class="modal-header">
+      <div class="modal-title-row">
+        <h2 id="privacy-title">Privacy Policy</h2>
+        <span class="modal-tag">v1.0 · March 2026</span>
+      </div>
+      <button class="modal-close" onclick="closeModal('privacy-modal')" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <h3>Overview</h3>
+      <p>ksw is a local command-line tool. It does <strong>not</strong> have a backend, does not collect telemetry, and does not transmit any personal data to the author or any server controlled by the author.</p>
+
+      <h3>Data Stored Locally</h3>
+      <p>All state is stored exclusively on your machine. This includes:</p>
+      <ul>
+        <li>Pinned contexts, aliases, groups, and history — stored in a local config file (e.g., <code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">~/.ksw.yaml</code>).</li>
+        <li>AI provider credentials (API keys) — stored only in your local config file and never sent anywhere except directly to the chosen AI provider's API endpoint.</li>
+        <li>Conversational history for the AI chat feature — kept in memory for the duration of the session and optionally persisted locally. It is never uploaded.</li>
+      </ul>
+
+      <h3>Third-Party AI Providers</h3>
+      <p>When you use the AI features, your prompts and context metadata (cluster names, aliases, groups) are sent to the AI provider you configured (OpenAI, Anthropic, Google, or AWS Bedrock). Each provider has its own privacy policy:</p>
+      <ul>
+        <li><a href="https://openai.com/policies/privacy-policy" target="_blank">OpenAI Privacy Policy</a></li>
+        <li><a href="https://www.anthropic.com/legal/privacy" target="_blank">Anthropic Privacy Policy</a></li>
+        <li><a href="https://policies.google.com/privacy" target="_blank">Google Privacy Policy</a></li>
+        <li><a href="https://aws.amazon.com/privacy/" target="_blank">AWS Privacy Notice</a></li>
+      </ul>
+      <p>The author of ksw has no control over how those providers process your data. Review their policies before enabling AI features.</p>
+
+      <h3>Analytics &amp; Tracking</h3>
+      <p>The ksw binary itself contains <strong>no analytics, tracking, or crash reporting</strong>. No usage data is ever collected or transmitted by the tool.</p>
+      <p>This landing page (<a href="https://yoniergomez.github.io/ksw/" target="_blank">yoniergomez.github.io/ksw</a>) is hosted on GitHub Pages. GitHub may collect certain request metadata (IP address, referrer, etc.) according to the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank">GitHub Privacy Statement</a>.</p>
+
+      <h3>Cookies</h3>
+      <p>This website does not use cookies or any client-side tracking technologies. No consent banner is required.</p>
+
+      <h3>Children's Privacy</h3>
+      <p>ksw is a developer tool not directed at children under 13. We do not knowingly collect information from children.</p>
+
+      <h3>Changes to This Policy</h3>
+      <p>This policy may be updated over time. The latest version is always available in this page and in the project repository. Continued use of the Software after changes constitutes acceptance of the updated policy.</p>
+
+      <h3>Contact</h3>
+      <p>For privacy-related questions, open an issue at <a href="https://github.com/YonierGomez/ksw/issues" target="_blank">GitHub Issues</a> or reach out via <a href="https://www.yonier.com" target="_blank">yonier.com</a>.</p>
+    </div>
+    <div class="modal-footer">Last updated: March 2026 &nbsp;·&nbsp; <a href="https://github.com/YonierGomez/ksw" target="_blank" style="color:var(--cyan)">YonierGomez/ksw</a></div>
+  </div>
+</div>
 
 <script>
   // ── Scroll animations ──
@@ -1146,6 +1374,27 @@
   // Start with TUI
   animateTui();
   slideTimer = setInterval(() => { showTerminal(!showingAI); }, 10000);
+
+  // ── Modal helpers ──
+  function openModal(id) {
+    document.getElementById(id).classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  function closeModalOnOverlay(e, id) {
+    if (e.target === e.currentTarget) closeModal(id);
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-overlay.open').forEach(m => {
+        m.classList.remove('open');
+        document.body.style.overflow = '';
+      });
+    }
+  });
 </script>
 
 </body>
