@@ -3,11 +3,15 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 // ── Estructuras de datos EKS ──────────────────────────
@@ -188,13 +192,19 @@ func parseListClustersJSON(data []byte) ([]string, error) {
 // y retorna la lista de nombres de clústeres descubiertos.
 // Maneja errores de credenciales y red sin interrumpir la ejecución.
 func listEKSClusters(profile, region string) ([]string, error) {
-	out, err := exec.Command("aws", "eks", "list-clusters",
+	cmd := exec.Command("aws", "eks", "list-clusters",
 		"--profile", profile,
 		"--region", region,
 		"--output", "json",
-	).Output()
+	)
+	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to list EKS clusters for profile '%s' in %s: %w", profile, region, err)
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
+			stderr := strings.TrimSpace(string(exitErr.Stderr))
+			return nil, fmt.Errorf("%s", stderr)
+		}
+		return nil, fmt.Errorf("aws eks list-clusters failed: %w", err)
 	}
 	return parseListClustersJSON(out)
 }
@@ -254,7 +264,17 @@ func mergeKubeconfigs(mainKubeconfig string, tmpFiles []string) error {
 	if len(tmpFiles) == 0 {
 		return nil
 	}
-	paths := []string{mainKubeconfig}
+
+	// Asegurar que el directorio ~/.kube/ exista
+	if err := os.MkdirAll(filepath.Dir(mainKubeconfig), 0700); err != nil {
+		return fmt.Errorf("failed to create kubeconfig directory: %w", err)
+	}
+
+	// Solo incluir mainKubeconfig en el env si el archivo ya existe
+	var paths []string
+	if _, err := os.Stat(mainKubeconfig); err == nil {
+		paths = append(paths, mainKubeconfig)
+	}
 	paths = append(paths, tmpFiles...)
 	kubeconfigEnv := strings.Join(paths, ":")
 
@@ -294,6 +314,20 @@ func partitionClusters(discovered []eksCluster, existing map[string]bool) (newCl
 
 // handleEksKubeconfig ejecuta la sincronización completa de clústeres EKS al kubeconfig.
 // Si profileFilter no está vacío, solo procesa el perfil indicado.
+func cliProgressBar(current, total, width int) string {
+	if total == 0 {
+		return strings.Repeat("░", width)
+	}
+	filled := current * width / total
+	if filled > width {
+		filled = width
+	}
+	cyanSt := lipgloss.NewStyle().Foreground(lipgloss.Color("#00b4d8"))
+	return cyanSt.Render(strings.Repeat("█", filled)) + dimStyle.Render(strings.Repeat("░", width-filled))
+}
+
+var cyanStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#00b4d8"))
+
 func handleEksKubeconfig(profileFilter string) {
 	fmt.Println(logoStyle.Render("⎈ ksw eks kubeconfig"))
 	fmt.Println()
@@ -324,7 +358,10 @@ func handleEksKubeconfig(profileFilter string) {
 		}
 	}
 
-	// 4. Descubrir clústeres EKS por perfil (en paralelo)
+	// 4. Descubrir clústeres EKS por perfil (en paralelo, máx 32 concurrentes)
+	const maxConcurrent = 32
+	sem := make(chan struct{}, maxConcurrent)
+
 	type profileResult struct {
 		profile  awsProfile
 		clusters []string
@@ -333,29 +370,67 @@ func handleEksKubeconfig(profileFilter string) {
 	resultsCh := make(chan profileResult, len(profiles))
 	for _, p := range profiles {
 		go func(p awsProfile) {
+			sem <- struct{}{}
 			clusters, err := listEKSClusters(p.Name, p.Region)
+			<-sem
 			resultsCh <- profileResult{profile: p, clusters: clusters, err: err}
 		}(p)
 	}
 
+	total := len(profiles)
+	remaining := total
+	done := 0
+	spinnerLabel := func() string {
+		bar := cliProgressBar(done, total, 20)
+		return fmt.Sprintf("Scanning profiles... %s %s",
+			bar, dimStyle.Render(fmt.Sprintf("%d / %d", done, total)))
+	}
+
+	spinnerDone := make(chan struct{})
+	labelCh := make(chan string, total)
+	go func() {
+		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		i := 0
+		label := spinnerLabel()
+		for {
+			select {
+			case <-spinnerDone:
+				fmt.Printf("\r\033[K")
+				return
+			case l := <-labelCh:
+				label = l
+			default:
+				fmt.Printf("\r  %s %s", successStyle.Render(frames[i%len(frames)]), label)
+				i++
+				time.Sleep(80 * time.Millisecond)
+			}
+		}
+	}()
+
 	var allDiscovered []eksCluster
+
 	for range profiles {
 		r := <-resultsCh
+		done++
+		remaining--
+		labelCh <- spinnerLabel()
 		if r.err != nil {
-			fmt.Printf("  %s Scanning profile '%s' (%s)... %s\n",
+			fmt.Printf("\r\033[K  %s profile '%s' [%s] — %s\n",
 				warnStyle.Render("✗"), r.profile.Name, r.profile.Region, dimStyle.Render(r.err.Error()))
-			continue
-		}
-		fmt.Printf("  Scanning profile '%s' (%s)... %s\n",
-			r.profile.Name, r.profile.Region, successStyle.Render(fmt.Sprintf("%d clusters found", len(r.clusters))))
-		for _, c := range r.clusters {
-			allDiscovered = append(allDiscovered, eksCluster{Name: c, Profile: r.profile.Name, Region: r.profile.Region})
+		} else if len(r.clusters) > 0 {
+			fmt.Printf("\r\033[K  %s profile '%s' [%s] — %s\n",
+				successStyle.Render("✔"), r.profile.Name, r.profile.Region,
+				cyanStyle.Render(fmt.Sprintf("%d cluster(s) found", len(r.clusters))))
+			for _, c := range r.clusters {
+				allDiscovered = append(allDiscovered, eksCluster{Name: c, Profile: r.profile.Name, Region: r.profile.Region})
+			}
 		}
 	}
+	close(spinnerDone)
 	fmt.Println()
 
 	if len(allDiscovered) == 0 {
-		fmt.Println(dimStyle.Render("No EKS clusters found across all profiles."))
+		fmt.Println(dimStyle.Render("  No clusters found across all profiles — check SSO session and profile regions."))
 		return
 	}
 
@@ -395,26 +470,60 @@ func handleEksKubeconfig(profileFilter string) {
 	for i, c := range newClusters {
 		tmpFile := filepath.Join(tmpDir, fmt.Sprintf("cluster-%d.yaml", i))
 		go func(c eksCluster, tmpFile string) {
+			sem <- struct{}{}
 			err := updateKubeconfig(c.Name, c.Profile, c.Region, tmpFile)
+			<-sem
 			syncCh <- syncOutcome{cluster: c, tmpFile: tmpFile, err: err}
 		}(c, tmpFile)
 	}
 
 	var result syncResult
 	var tmpFiles []string
+
+	addedCount := 0
+	totalNew := len(newClusters)
+	addLabel := func() string {
+		bar := cliProgressBar(addedCount, totalNew, 20)
+		return fmt.Sprintf("Adding clusters... %s %s",
+			bar, dimStyle.Render(fmt.Sprintf("%d / %d", addedCount, totalNew)))
+	}
+	syncSpinnerDone := make(chan struct{})
+	addLabelCh := make(chan string, totalNew)
+	go func() {
+		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		i := 0
+		label := addLabel()
+		for {
+			select {
+			case <-syncSpinnerDone:
+				fmt.Printf("\r\033[K")
+				return
+			case l := <-addLabelCh:
+				label = l
+			default:
+				fmt.Printf("\r  %s %s", successStyle.Render(frames[i%len(frames)]), label)
+				i++
+				time.Sleep(80 * time.Millisecond)
+			}
+		}
+	}()
+
 	for range newClusters {
 		s := <-syncCh
 		if s.err != nil {
-			fmt.Printf("  %s Failed: %s (%s)\n",
-				warnStyle.Render("✗"), s.cluster.Name, dimStyle.Render(s.err.Error()))
 			result.Failed++
+			fmt.Printf("\r\033[K  %s failed %s — %s\n",
+				warnStyle.Render("✗"), s.cluster.Name, dimStyle.Render(s.err.Error()))
 		} else {
-			fmt.Printf("  %s Added: %s (profile: %s)\n",
-				successStyle.Render("✔"), s.cluster.Name, s.cluster.Profile)
-			tmpFiles = append(tmpFiles, s.tmpFile)
+			addedCount++
 			result.Added++
+			tmpFiles = append(tmpFiles, s.tmpFile)
+			fmt.Printf("\r\033[K  %s added %s  (%s)\n",
+				cyanStyle.Render("✔"), s.cluster.Name, s.cluster.Profile)
 		}
+		addLabelCh <- addLabel()
 	}
+	close(syncSpinnerDone)
 
 	// Merge todos los kubeconfigs temporales al principal
 	if len(tmpFiles) > 0 {
@@ -423,16 +532,17 @@ func handleEksKubeconfig(profileFilter string) {
 		}
 	}
 
-	// 8. Mostrar clústeres existentes omitidos
+	// Mostrar clústeres existentes omitidos
 	for _, c := range existingClusters {
-		fmt.Printf("  %s Skipped: %s (already exists)\n",
+		fmt.Printf("  %s skipped %s (already in kubeconfig)\n",
 			dimStyle.Render("·"), c.Name)
 		result.Skipped++
 	}
 
-	// 9. Resumen final
+	// Resumen final
 	fmt.Println()
-	fmt.Printf("Done: %s added, %s skipped, %s failed\n",
+	fmt.Printf("  %s Done — %s added, %s skipped, %s failed\n",
+		successStyle.Render("✔"),
 		successStyle.Render(fmt.Sprintf("%d", result.Added)),
 		dimStyle.Render(fmt.Sprintf("%d", result.Skipped)),
 		warnStyle.Render(fmt.Sprintf("%d", result.Failed)))
@@ -444,29 +554,175 @@ func handleEks() {
 	args := os.Args[2:] // skip "ksw" and "eks"
 
 	if len(args) == 0 {
-		fmt.Printf(`%s
-
-Usage:
-  ksw eks kubeconfig                Sync EKS clusters to kubeconfig
-  ksw eks kubeconfig --profile <n>  Sync only one AWS profile
-`, logoStyle.Render("⎈ ksw eks"))
+		fmt.Println(logoStyle.Render("⎈ ksw eks"))
+		fmt.Println()
+		fmt.Println("  Usage:")
+		fmt.Println("    ksw eks config                           Interactive TUI for kubeconfig management")
+		fmt.Println("    ksw eks kubeconfig sync                  Sync EKS clusters → ~/.kube/config")
+		fmt.Println("    ksw eks kubeconfig sync --profile <name> Sync only one AWS profile")
+		fmt.Println()
 		return
 	}
 
 	switch args[0] {
+	case "config":
+		handleEksTUI()
+
 	case "kubeconfig":
-		// Parse --profile flag
-		profileFilter := ""
-		for i := 1; i < len(args); i++ {
-			if args[i] == "--profile" && i+1 < len(args) {
-				profileFilter = args[i+1]
+		if len(args) < 2 {
+			fmt.Println(logoStyle.Render("⎈ ksw eks kubeconfig"))
+			fmt.Println()
+			fmt.Println("  Usage:")
+			fmt.Println("    ksw eks kubeconfig sync                  Sync EKS clusters → ~/.kube/config")
+			fmt.Println("    ksw eks kubeconfig sync --profile <name> Sync only one AWS profile")
+			fmt.Println()
+			return
+		}
+		switch args[1] {
+		case "sync":
+			profileFilter := ""
+			for i := 2; i < len(args); i++ {
+				if args[i] == "--profile" && i+1 < len(args) {
+					profileFilter = args[i+1]
+					break
+				}
+			}
+			handleEksKubeconfig(profileFilter)
+		default:
+			fmt.Fprintf(os.Stderr, "%s Unknown subcommand: ksw eks kubeconfig %s\n", warnStyle.Render("✗"), args[1])
+			fmt.Fprintf(os.Stderr, "Run 'ksw eks kubeconfig' for usage.\n")
+			os.Exit(1)
+		}
+
+	case "create-profiles":
+		handleCreateProfiles()
+
+	default:
+		fmt.Fprintf(os.Stderr, "%s Unknown subcommand: ksw eks %s\n", warnStyle.Render("✗"), args[0])
+		fmt.Fprintf(os.Stderr, "Run 'ksw eks' for usage.\n")
+		os.Exit(1)
+	}
+}
+
+var awsUsage = `%s
+
+Usage:
+  ksw aws sso config                      Configure AWS SSO sessions (TUI)
+  ksw aws sso login                       Login to default SSO session
+  ksw aws sso login <session>             Login to a specific SSO session
+  ksw aws sso profiles list               List configured AWS profiles
+  ksw aws sso profiles sync               Auto-sync SSO accounts to ~/.aws/config
+  ksw aws sso profiles add <name> <id>    Add a single profile [--session <s>]
+  ksw aws sso profiles search <term>      Search profiles by name or account ID
+`
+
+var ssoUsage = `%s
+
+Usage:
+  ksw aws sso config                      Configure AWS SSO sessions (TUI)
+  ksw aws sso login                       Login to default SSO session
+  ksw aws sso login <session>             Login to a specific SSO session
+  ksw aws sso profiles list               List configured AWS profiles
+  ksw aws sso profiles sync               Auto-sync SSO accounts to ~/.aws/config
+  ksw aws sso profiles add <name> <id>    Add a single profile [--session <s>]
+  ksw aws sso profiles search <term>      Search profiles by name or account ID
+`
+
+var ssoProfilesUsage = `%s
+
+Usage:
+  ksw aws sso profiles list               List configured AWS profiles
+  ksw aws sso profiles sync               Auto-sync SSO accounts to ~/.aws/config
+  ksw aws sso profiles add <name> <id>    Add a single profile [--session <s>]
+  ksw aws sso profiles search <term>      Search profiles by name or account ID
+`
+
+func handleAWS() {
+	args := os.Args[2:] // skip "ksw" and "aws"
+
+	if len(args) == 0 {
+		fmt.Printf(awsUsage, logoStyle.Render("⎈ ksw aws"))
+		return
+	}
+
+	switch args[0] {
+	case "sso":
+		handleAWSSSO(args[1:])
+	default:
+		fmt.Fprintf(os.Stderr, "%s Unknown subcommand: ksw aws %s\n", warnStyle.Render("✗"), args[0])
+		fmt.Fprintf(os.Stderr, "Run 'ksw aws' for usage.\n")
+		os.Exit(1)
+	}
+}
+
+func handleAWSSSO(args []string) {
+	if len(args) == 0 {
+		fmt.Printf(ssoUsage, logoStyle.Render("⎈ ksw aws sso"))
+		return
+	}
+
+	// ── Premium gate ──────────────────────────────────────
+	if !isLicenseValid() {
+		buyURL := "https://ksw.lemonsqueezy.com/checkout/buy/5b89e2bc-9b58-4343-84d3-2dcbf22d67a1"
+		// OSC 8 hyperlink — clickeable en iTerm2, Terminal.app, VSCode
+		clickable := "\033]8;;" + buyURL + "\033\\" + buyURL + "\033]8;;\033\\"
+		fmt.Println(logoStyle.Render("⎈ ksw aws sso") + "  " + warnStyle.Render("[ premium ]"))
+		fmt.Println()
+		fmt.Println("  " + warnStyle.Render("✗") + " This feature requires a valid license.")
+		fmt.Println()
+		fmt.Println("  " + dimStyle.Render("Activate with: ksw license activate <your-key>"))
+		fmt.Println("  " + dimStyle.Render("Get a license: "+clickable))
+		fmt.Println("  " + dimStyle.Render("Or run:        ksw license buy"))
+		os.Exit(1)
+	}
+
+	switch args[0] {
+	case "config":
+		handleSSOConfig()
+	case "login":
+		handleSSOLogin()
+	case "profiles":
+		handleAWSSSO_Profiles(args[1:])
+	default:
+		fmt.Fprintf(os.Stderr, "%s Unknown subcommand: ksw aws sso %s\n", warnStyle.Render("✗"), args[0])
+		fmt.Fprintf(os.Stderr, "Run 'ksw aws sso' for usage.\n")
+		os.Exit(1)
+	}
+}
+
+func handleAWSSSO_Profiles(args []string) {
+	if len(args) == 0 {
+		fmt.Printf(ssoProfilesUsage, logoStyle.Render("⎈ ksw aws sso profiles"))
+		return
+	}
+
+	switch args[0] {
+	case "list", "ls":
+		handleListProfiles()
+	case "sync":
+		handleCreateProfiles()
+	case "add":
+		if len(args) < 3 {
+			fmt.Fprintf(os.Stderr, "%s Usage: ksw aws sso profiles add <name> <account-id> [--session <s>]\n", warnStyle.Render("✗"))
+			os.Exit(1)
+		}
+		session := ""
+		for i := 3; i < len(args); i++ {
+			if args[i] == "--session" && i+1 < len(args) {
+				session = args[i+1]
 				break
 			}
 		}
-		handleEksKubeconfig(profileFilter)
+		handleAddProfile(args[1], args[2], session)
+	case "search":
+		if len(args) < 2 {
+			fmt.Fprintf(os.Stderr, "%s Usage: ksw aws sso profiles search <term>\n", warnStyle.Render("✗"))
+			os.Exit(1)
+		}
+		handleSearchProfiles(args[1])
 	default:
-		fmt.Fprintf(os.Stderr, "%s Unknown subcommand: %s\n", warnStyle.Render("✗"), args[0])
-		fmt.Fprintf(os.Stderr, "Run 'ksw eks' for usage.\n")
+		fmt.Fprintf(os.Stderr, "%s Unknown subcommand: ksw aws sso profiles %s\n", warnStyle.Render("✗"), args[0])
+		fmt.Fprintf(os.Stderr, "Run 'ksw aws sso profiles' for usage.\n")
 		os.Exit(1)
 	}
 }

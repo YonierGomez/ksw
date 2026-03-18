@@ -10,10 +10,8 @@
 [![macOS](https://img.shields.io/badge/macOS-arm64%20%7C%20amd64-black?style=flat-square&logo=apple)](https://github.com/YonierGomez/ksw/releases/latest)
 [![Linux](https://img.shields.io/badge/Linux-arm64%20%7C%20amd64-FCC624?style=flat-square&logo=linux&logoColor=black)](https://github.com/YonierGomez/ksw/releases/latest)
 [![GitHub Stars](https://img.shields.io/github/stars/YonierGomez/ksw?style=flat-square&logo=github)](https://github.com/YonierGomez/ksw/stargazers)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕-yellow?style=flat-square&logo=buy-me-a-coffee)](https://buymeacoffee.com/yoniergomez)
-[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-❤️-ea4aaa?style=flat-square&logo=github-sponsors)](https://github.com/sponsors/YonierGomez)
 
-Switch contexts with natural language, manage groups, pins and aliases — all by just telling the AI what you need. Or use the blazing-fast interactive TUI with fuzzy search. Single binary, no runtime dependencies.
+Switch contexts with natural language, manage groups, pins and aliases. Sync AWS SSO profiles and EKS clusters to kubeconfig automatically. Single binary, no runtime dependencies.
 
 > Available for **macOS** and **Linux** (amd64 & arm64).
 
@@ -23,77 +21,34 @@ Switch contexts with natural language, manage groups, pins and aliases — all b
 ### AI — Natural Language
 ![AI demo](demo/ai.gif)
 
- — Natural Language Context Management
+---
 
-Talk to your clusters. `ksw ai` understands what you mean and executes it.
+## Features
 
-![AI demo](demo/ai.gif)
+### Free
 
-```bash
-# Switch contexts with natural language
-ksw ai "switch to payments dev"
-# ✔ Switched to arn:aws:eks:us-east-1:111122223333:cluster/eks-payments-dev
+- **Fuzzy search** — type any part of a context name to filter instantly
+- **Short-name switching** — `ksw payments-dev` instead of the full ARN
+- **Aliases** — `ksw @prod` gets you there instantly
+- **Pins** — pin favorites to always appear at the top (`Ctrl+P` in TUI)
+- **Groups** — organize contexts and open TUI filtered to a group
+- **Previous context** — `ksw -` toggles back like `cd -` in bash
+- **History** — `ksw history` shows last 10 contexts, `ksw history 3` jumps to any
+- **AI natural language** — switch, create, list, rename — just describe what you want
+- **EKS kubeconfig sync** — discover and add EKS clusters to kubeconfig in parallel
+- **EKS TUI** (`ksw eks config`) — interactive manager for kubeconfig: sync, view clusters, remove stale
+- **Shell completion** — zsh and bash
 
-# Create groups, pins, aliases — just ask
-ksw ai "create a group called backend with payments and orders dev"
-# ✔ Group 'backend' created (2 contexts)
+### ★ Premium
 
-ksw ai "pin nequi dev"
-# ✔ Pinned ★ arn:.../eks-nequi-dev
+> Get a license at **[ksw.lemonsqueezy.com/checkout](https://ksw.lemonsqueezy.com/checkout/buy/5b89e2bc-9b58-4343-84d3-2dcbf22d67a1)**
 
-# Ask questions about your setup
-ksw ai "list my pins and groups as a table"
-# (AI builds a formatted table from your current state)
+- **AWS SSO config TUI** (`ksw aws sso config`) — create, edit, delete SSO sessions, login, sync profiles and kubeconfig — all from an interactive TUI
+- **AWS SSO login** (`ksw aws sso login`) — login to any configured SSO session
+- **Profile sync** (`ksw aws sso profiles sync`) — auto-scan SSO accounts and sync all profiles to `~/.aws/config` with live progress
+- **Profile management** (`ksw aws sso profiles list/add/search`) — list, add and search AWS profiles
 
-# Conversational memory — it remembers context
-ksw ai "switch to sufi qa"
-ksw ai "now the same but in dev"
-# ✔ Switched to arn:.../eks-sufi-dev
-
-ksw ai "go back to the previous one"
-# ✔ Switched to arn:.../eks-sufi-qa
-
-# Multi-action — multiple tasks in one prompt
-ksw ai "list my pins and groups"
-# (executes both commands in a single call)
-
-# Delete, rename, explore — anything you can do manually
-ksw ai "delete the sufi group"
-ksw ai "rename payments-dev to pay-dev"
-ksw ai "what have I done so far?"
-# (shows your recent history from conversational memory)
-```
-
-### Supported AI Providers
-
-| Provider | Models | Auth |
-|----------|--------|------|
-| OpenAI | gpt-4o, gpt-4o-mini, etc. | API Key |
-| Claude (Anthropic) | claude-sonnet-4-20250514, etc. | API Key |
-| Gemini (Google) | gemini-2.0-flash, etc. | API Key |
-| AWS Bedrock | Any Bedrock model (Claude, Llama, etc.) | AWS Profile, Access Keys, or Env vars |
-
-### AI Configuration
-
-```bash
-# Interactive setup wizard
-ksw ai config
-# → Select provider (openai / claude / gemini / bedrock)
-# → Choose model
-# → Enter credentials
-# → Done!
-```
-
-### AI Features
-
-- **Natural language** — switch, create, delete, list, rename — just describe what you want
-- **Conversational memory** — remembers your last 10 interactions, understands "the previous one", "same but in qa"
-- **Multi-action** — execute multiple tasks in a single prompt
-- **Smart formatting** — ask for tables, summaries, or any custom format
-- **Response cache** — 30s TTL avoids duplicate LLM calls for repeated queries
-- **Full state awareness** — AI knows your current context, groups, pins, aliases, and history
-- **Pre-filtering** — extracts keywords locally to narrow candidates before calling the LLM
-- **Retry with backoff** — handles rate limits (429) and server errors gracefully
+---
 
 ## Install
 
@@ -102,8 +57,6 @@ ksw ai config
 ```bash
 curl -sL https://raw.githubusercontent.com/YonierGomez/ksw/main/install.sh | bash
 ```
-
-Automatically detects your OS and architecture (amd64/arm64) and installs to `/usr/local/bin`.
 
 ### Homebrew (macOS & Linux)
 
@@ -129,7 +82,7 @@ sudo mv ksw-linux-arm64 /usr/local/bin/ksw
 ### Manual — macOS
 
 ```bash
-# Apple Silicon (M1/M2/M3)
+# Apple Silicon (M1/M2/M3/M4)
 curl -sL https://github.com/YonierGomez/ksw/releases/latest/download/ksw-darwin-arm64.tar.gz | tar xz
 chmod +x ksw-darwin-arm64
 sudo mv ksw-darwin-arm64 /usr/local/bin/ksw
@@ -146,53 +99,76 @@ sudo mv ksw-darwin-amd64 /usr/local/bin/ksw
 go install github.com/YonierGomez/ksw@latest
 ```
 
+---
+
 ## Usage
 
 ```bash
-# ── AI (natural language) ──
-ksw ai "<query>"             # AI-powered: switch, create, list, delete — anything
-ksw ai chat                  # Interactive conversational mode (multi-turn)
-ksw ai config                # Configure AI provider and credentials
+# ── Context ──
+ksw                              # Interactive TUI (fuzzy search)
+ksw <name>                       # Switch directly (short name ok)
+ksw -                            # Switch to previous context
+ksw rename <old> <new>           # Rename a context in kubeconfig
+ksw -l                           # List contexts (non-interactive)
 
-# ── Interactive TUI ──
-ksw                          # Interactive selector (fuzzy search)
-ksw <name>                   # Switch directly (short name ok: ksw payments-dev)
-ksw -                        # Switch to previous context
-ksw @<alias>                 # Switch using alias
+# ── AI ──
+ksw ai "<query>"                 # Natural language: switch, create, list, delete...
+ksw ai chat                      # Interactive conversational mode (multi-turn)
+ksw ai config                    # Configure AI provider (openai, claude, gemini, bedrock)
 
-# ── History ──
-ksw history                  # Show recent context history
-ksw history <n>              # Switch to history entry by number
-
-# ── Groups ──
-ksw group add <name> [ctx]   # Create a group and add contexts to it
-ksw group rm <name>          # Remove a group
-ksw group ls                 # List all groups with their members
-ksw group use <name>         # Open TUI filtered to a group
-ksw group add-ctx <g> <ctx>  # Add a context to an existing group
-ksw group rmi <g> <ctx>      # Remove a context from a group
+# ── Aliases ──
+ksw @<alias>                     # Switch using alias
+ksw alias <name> <context>       # Create alias
+ksw alias rm <name>              # Remove alias
+ksw alias ls                     # List aliases
 
 # ── Pins ──
-ksw pin <name>               # Pin a context to the top of the list
-ksw pin rm <name>            # Unpin a context
-ksw pin ls                   # List pinned contexts
-ksw pin use                  # Open TUI filtered to pinned contexts only
+ksw pin <name>                   # Pin context to top of list
+ksw pin rm <name>                # Unpin
+ksw pin ls                       # List pins
+ksw pin use                      # TUI filtered to pinned only
 
-# ── Aliases & Rename ──
-ksw alias <name> <context>   # Create alias for a context
-ksw alias rm <name>          # Remove an alias
-ksw alias ls                 # List all aliases
-ksw rename <old> <new>       # Rename a context in kubeconfig
+# ── Groups ──
+ksw group add <name> [ctx...]    # Create group (glob ok: "eks-pay*")
+ksw group rm <name>              # Remove group
+ksw group ls                     # List groups
+ksw group use <name>             # TUI filtered to group
+ksw group add-ctx <g> <ctx>      # Add context to group
+ksw group rmi <g> <ctx>          # Remove context from group
+
+# ── History ──
+ksw history                      # Show recent context history
+ksw history <n>                  # Switch to history entry by number
+
+# ── EKS ──
+ksw eks config                   # Interactive EKS / kubeconfig manager (TUI)
+ksw eks kubeconfig sync          # Sync EKS clusters → ~/.kube/config
+ksw eks kubeconfig sync --profile <n>  # Sync only one AWS profile
+
+# ── AWS SSO [premium] ──
+ksw aws sso config               # Interactive SSO session manager (TUI)
+ksw aws sso login                # Login to default SSO session
+ksw aws sso login <session>      # Login to a specific SSO session
+ksw aws sso profiles list        # List configured AWS profiles
+ksw aws sso profiles sync        # Auto-sync SSO accounts to ~/.aws/config
+ksw aws sso profiles add <n> <id>  # Add a single profile
+ksw aws sso profiles search <t>  # Search profiles by name or account ID
+
+# ── License ──
+ksw license activate             # Activate interactively (key hidden)
+ksw license activate <key>       # Activate with key as argument
+ksw license deactivate           # Remove license (frees slot to move to another machine)
+ksw license buy                  # Open checkout in browser
+ksw license status               # Show license status
+
+# ── Shell Completion ──
+ksw completion install           # Auto-install in ~/.zshrc or ~/.bashrc
+ksw completion zsh               # Print zsh setup line
+ksw completion bash              # Print bash setup line
 
 # ── Other ──
-ksw eks kubeconfig           # Sync all EKS clusters to kubeconfig (parallel)
-ksw eks kubeconfig --profile <name>  # Sync only one AWS profile
-ksw completion install       # Auto-install shell completion (~/.zshrc or ~/.bashrc)
-ksw completion zsh           # Print zsh setup line
-ksw completion bash          # Print bash setup line
-ksw -l                       # List contexts (non-interactive)
-ksw -v                       # Version
-ksw -h                       # Help
+ksw -h, --help                   # Help
+ksw -v, --version                # Version
 ```
 
 ### Interactive TUI Navigation
@@ -207,185 +183,116 @@ ksw -h                       # Help
 | `Enter`      | Switch to highlighted context       |
 | `Ctrl+P`     | Pin / unpin current context (★)     |
 | `Ctrl+T`     | Jump to first pinned context        |
-| `Ctrl+F`     | Toggle pinned-only filter `[★ pinned]` |
+| `Ctrl+F`     | Toggle pinned-only filter           |
 | `Ctrl+H`     | Toggle short name view (persisted)  |
 | `Esc`        | Clear filter / Quit                 |
 | `Ctrl+C`     | Quit                                |
 
-### Short-name switching
+---
 
-You can switch to a context using just the cluster name, without the full ARN:
+## AI — Natural Language
 
 ```bash
-ksw eks-payments-dev
+ksw ai "switch to payments dev"
 # ✔ Switched to arn:aws:eks:us-east-1:111122223333:cluster/eks-payments-dev
+
+ksw ai "create a group called backend with payments and orders dev"
+# ✔ Group 'backend' created (2 contexts)
+
+# Conversational memory — remembers last 10 interactions
+ksw ai "switch to sufi qa"
+ksw ai "now the same but in dev"
+# ✔ Switched to arn:.../eks-sufi-dev
+
+ksw ai "go back to the previous one"
+# ✔ Switched to arn:.../eks-sufi-qa
+
+ksw ai "list my pins and groups as a table"
+# AI builds a formatted table from your current state
+
+ksw ai chat           # Interactive conversational TUI
+ksw ai config         # Setup wizard: provider, model, credentials
 ```
 
-If the name is ambiguous, ksw will show all matches:
+### Supported AI Providers
+
+| Provider | Models | Auth |
+|----------|--------|------|
+| OpenAI | gpt-4o, gpt-4o-mini, etc. | API Key |
+| Claude (Anthropic) | claude-sonnet-4-20250514, etc. | API Key |
+| Gemini (Google) | gemini-2.0-flash, etc. | API Key |
+| AWS Bedrock | Claude, Llama, etc. | AWS Profile / Access Keys / Env vars |
+
+---
+
+## EKS Kubeconfig Sync
+
+Discover and add all your EKS clusters to kubeconfig automatically. Parallel discovery with live progress bar.
 
 ```bash
-ksw payments
-# ✗ Ambiguous context 'payments', matches:
-#   arn:.../eks-payments-dev
-#   arn:.../eks-payments-qa
-```
+# Interactive TUI — sync, view clusters, remove stale
+ksw eks config
 
-### Pinned contexts
-
-Pin your most-used contexts so they always appear at the top of the list:
-
-![Pins demo](demo/pins.gif)
-
-```bash
-ksw pin eks-payments-dev     # Pin by short name
-ksw pin ls                   # List pinned contexts
-ksw pin rm eks-payments-dev  # Unpin
-```
-
-In the TUI, pinned contexts appear in **yellow** with a `★` marker. Press `Ctrl+P` to toggle pin on the current item, and `Ctrl+T` to jump to the first pinned context from anywhere in the list.
-
-### Previous context
-
-Switch back to the last context instantly — like `cd -` in bash:
-
-![Previous context demo](demo/previous.gif)
-
-```bash
-ksw -
-# ✔ Switched to arn:.../eks-payments-qa
-
-# Toggle back and forth between two contexts
-ksw payments-dev   # switch to dev
-ksw -              # back to qa
-ksw -              # back to dev
-```
-
-### History
-
-Show the last 10 contexts you visited:
-
-![History demo](demo/history.gif)
-
-```bash
-ksw history
-#   Recent contexts:
-#   1  arn:.../eks-payments-dev ●
-#   2  arn:.../eks-payments-qa
-#   3  arn:.../eks-payments-pdn
-#   4  arn:.../eks-orders-dev
-#   5  arn:.../eks-orders-pdn
-```
-
-Switch directly to any history entry by number:
-
-```bash
-ksw history 3
-# ✔ Switched to arn:.../eks-payments-pdn
-
-ksw history 5
-# ✔ Switched to arn:.../eks-orders-pdn
-```
-
-### Groups
-
-Organize contexts into named groups and open the TUI filtered to only those contexts:
-
-![Groups demo](demo/groups.gif)
-
-```bash
-# Create a group with multiple contexts (short names or glob patterns)
-ksw group add payments eks-payments-dev eks-payments-qa eks-payments-pdn
-# ✔ Group payments — added 3 context(s)
-
-# Use substring match (simplest — matches anywhere in the name)
-ksw group add outposts outposts
-# ✔ Group outposts — added 9 context(s)
-
-# Use glob patterns — quote to prevent shell expansion
-# pattern*  → auto-wraps to *pattern* (matches anywhere)
-ksw group add payments "eks-payments*"
-# ✔ Group payments — added 3 context(s)
-#   · arn:.../eks-payments-dev
-#   · arn:.../eks-payments-qa
-#   · arn:.../eks-payments-pdn
-
-# Open TUI showing only the payments group
-ksw group use payments
-# [payments] label shown in header, only 3 contexts visible
-
-# List all groups
-ksw group ls
-# payments (3 contexts)
-#   · arn:.../eks-payments-dev
-#   · arn:.../eks-payments-qa
-#   · arn:.../eks-payments-pdn
-
-# Add a context to an existing group
-ksw group add-ctx payments eks-payments-staging
-
-# Remove a context from a group
-ksw group rmi payments eks-payments-staging
-
-# Remove a group entirely
-ksw group rm payments
-```
-
-### Aliases
-
-![Aliases demo](demo/aliases.gif)
-
-```bash
-ksw alias prod arn:aws:eks:us-east-1:111122223333:cluster/eks-payments-dev
-# ✔ Alias @prod → arn:.../eks-payments-dev
-
-ksw @prod
-# ✔ Switched to arn:.../eks-payments-dev @prod
-
-# Aliases also work with short names:
-ksw alias dev eks-payments-dev
-ksw @dev
-# ✔ Switched to arn:.../eks-payments-dev @dev
-```
-
-### Shell completion
-
-```bash
-ksw completion install   # Auto-installs in ~/.zshrc or ~/.bashrc
-# ✔ Installed zsh completion in /Users/you/.zshrc
-# Run: source ~/.zshrc
-```
-
-### Rename a context
-
-```bash
-ksw rename eks-payments-dev payments-dev
-# ✔ Renamed arn:.../eks-payments-dev → payments-dev
-```
-
-### EKS Kubeconfig Sync
-
-Automatically discover and add all your EKS clusters to kubeconfig. Reads AWS profiles from `~/.aws/config`, scans for clusters in parallel, detects duplicates, and adds only the missing ones.
-
-```bash
-# Sync all profiles (parallel discovery + parallel write)
-ksw eks kubeconfig
-#  ⎈ ksw eks kubeconfig
-#
-#   Scanning profile 'payments-dev' (us-east-1)... 2 clusters found
-#   Scanning profile 'orders-qa' (us-east-1)... 1 clusters found
-#   ✔ Added: eks-payments-dev (profile: payments-dev)
-#   ✔ Added: eks-payments-qa (profile: payments-dev)
-#   · Skipped: eks-orders-qa (already exists)
-#
-# Done: 2 added, 1 skipped, 0 failed
+# CLI — sync all profiles
+ksw eks kubeconfig sync
+#   ⠸ Scanning profiles... ████████████░░░░░░░░  127 / 257
+#   ✔ profile 'payments-dev' [us-east-1] — 2 cluster(s) found
+#   ✔ added eks-payments-dev  (payments-dev)
+#   ✔ Done — 3 added, 12 skipped, 0 failed
 
 # Sync only one profile
-ksw eks kubeconfig --profile payments-dev
-
-# Works with AI too
-ksw ai "sync clusters from the payments profile"
-ksw ai "add all my EKS clusters to kubeconfig"
+ksw eks kubeconfig sync --profile payments-dev
 ```
+
+---
+
+## AWS SSO — Premium
+
+Manage AWS SSO sessions and profiles from an interactive TUI. Automatically sync all accounts and roles to `~/.aws/config`.
+
+```bash
+# Activate license first
+ksw license activate
+
+# Interactive TUI — sessions, login, sync profiles, sync kubeconfig
+ksw aws sso config
+
+# Login
+ksw aws sso login
+ksw aws sso login my-session
+
+# Sync all SSO accounts to ~/.aws/config
+ksw aws sso profiles sync
+
+# List / search profiles
+ksw aws sso profiles list
+ksw aws sso profiles search payments
+```
+
+---
+
+## License (Premium)
+
+```bash
+# Activate (interactive — key is hidden)
+ksw license activate
+
+# Activate with key directly
+ksw license activate XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+
+# Check status
+ksw license status
+
+# Moving to a new machine? Deactivate first to free the slot
+ksw license deactivate
+
+# Open checkout in browser
+ksw license buy
+```
+
+Get a license at **[ksw.lemonsqueezy.com/checkout](https://ksw.lemonsqueezy.com/checkout/buy/5b89e2bc-9b58-4343-84d3-2dcbf22d67a1)**
+
+---
 
 ## Configuration
 
@@ -393,16 +300,9 @@ All settings are stored in `~/.ksw.json`:
 
 ```json
 {
-  "aliases": {
-    "prod": "arn:aws:eks:us-east-1:111122223333:cluster/eks-payments-dev"
-  },
-  "pins": [
-    "arn:aws:eks:us-east-1:111122223333:cluster/eks-payments-dev"
-  ],
-  "history": [
-    "arn:aws:eks:us-east-1:111122223333:cluster/eks-payments-dev",
-    "arn:aws:eks:us-east-1:444455556666:cluster/eks-payments-qa"
-  ],
+  "aliases": { "prod": "arn:aws:eks:us-east-1:111122223333:cluster/eks-payments-dev" },
+  "pins": ["arn:aws:eks:us-east-1:111122223333:cluster/eks-payments-dev"],
+  "history": ["arn:aws:eks:.../eks-payments-dev", "arn:aws:eks:.../eks-payments-qa"],
   "previous": "arn:aws:eks:us-east-1:444455556666:cluster/eks-payments-qa",
   "ai": {
     "provider": "bedrock",
@@ -411,14 +311,19 @@ All settings are stored in `~/.ksw.json`:
     "auth_method": "profile",
     "profile": "my-aws-profile"
   },
-  "ai_memory": [
-    {
-      "query": "switch to payments dev",
-      "action": "switch",
-      "result": "eks-payments-dev",
-      "time": 1709312400
+  "sso_sessions": {
+    "my-company": {
+      "session_name": "my-company",
+      "start_url": "https://d-xxxxxxxx.awsapps.com/start/#",
+      "sso_region": "us-east-1"
     }
-  ]
+  },
+  "license": {
+    "key_enc": "<encrypted>",
+    "email": "you@company.com",
+    "instance_id": "...",
+    "activated_at": "2026-03-17T..."
+  }
 }
 ```
 
@@ -426,18 +331,21 @@ All settings are stored in `~/.ksw.json`:
 
 - `kubectl` installed and configured
 - For `ksw ai` with AWS Bedrock: `aws` CLI installed and configured
-- For `ksw eks kubeconfig`: `aws` CLI installed and configured with profiles in `~/.aws/config`
+- For `ksw eks kubeconfig sync`: `aws` CLI with profiles in `~/.aws/config`
+- For `ksw aws sso`: premium license + `aws` CLI
 
 ## Roadmap
 
-- [ ] `ksw eks kubeconfig` — ~~auto-sync EKS clusters to kubeconfig~~ ✅ **Done in v1.5.0**
+- [x] `ksw eks kubeconfig sync` — auto-sync EKS clusters to kubeconfig ✅
+- [x] `ksw eks config` — interactive EKS / kubeconfig TUI ✅
+- [x] `ksw aws sso config` — AWS SSO session manager ✅
+- [x] `ksw aws sso profiles sync` — auto-sync SSO profiles ✅
+- [x] Premium licensing via Lemon Squeezy ✅
 - [ ] `ksw ai` — support for local models (Ollama)
 - [ ] `ksw diff` — compare two contexts side by side
-- [ ] `ksw export` — export pins, aliases and groups to share across machines
-- [ ] `ksw import` — import a shared config
+- [ ] `ksw export` / `ksw import` — share config across machines
 - [ ] Namespace switching within a context
-- [ ] Shell prompt integration (show current context in PS1/starship)
-- [ ] `ksw ai` — multi-step workflows ("switch to payments dev and list all pods")
+- [ ] Shell prompt integration (PS1 / starship)
 
 Have an idea? [Open an issue](https://github.com/YonierGomez/ksw/issues/new) or send a PR.
 

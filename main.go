@@ -14,7 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const version = "1.5.0"
+const version = "1.6.0"
 
 // ── Styles ─────────────────────────────────────────────
 var (
@@ -87,6 +87,17 @@ type config struct {
 	Groups     map[string][]string `json:"groups,omitempty"`
 	AI         aiConfig            `json:"ai,omitempty"`
 	AIMemory   []aiMemoryEntry     `json:"ai_memory,omitempty"`
+	SSO        ssoConfig           `json:"sso,omitempty"`
+	SSOSessions map[string]ssoConfig `json:"sso_sessions,omitempty"`
+	SSODefault  string               `json:"sso_default,omitempty"`
+	License     licenseData          `json:"license,omitempty"`
+}
+
+type ssoConfig struct {
+	SessionName string `json:"session_name,omitempty"`
+	StartURL    string `json:"start_url,omitempty"`
+	Region      string `json:"sso_region,omitempty"`
+	RoleName    string `json:"role_name,omitempty"`
 }
 
 const maxHistory = 10
@@ -96,10 +107,20 @@ func configPath() string {
 	return filepath.Join(home, ".ksw.json")
 }
 
+// ── Config (aliases + history + pins + groups) ────────
+var (
+	_cfgCache    *config
+	_cfgCacheErr bool
+)
+
 func loadConfig() config {
+	if _cfgCache != nil {
+		return *_cfgCache
+	}
 	c := config{Aliases: make(map[string]string), Groups: make(map[string][]string)}
 	data, err := os.ReadFile(configPath())
 	if err != nil {
+		_cfgCache = &c
 		return c
 	}
 	_ = json.Unmarshal(data, &c)
@@ -109,10 +130,12 @@ func loadConfig() config {
 	if c.Groups == nil {
 		c.Groups = make(map[string][]string)
 	}
+	_cfgCache = &c
 	return c
 }
 
 func saveConfig(c config) error {
+	_cfgCache = &c
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return err
@@ -201,30 +224,65 @@ func fuzzyMatch(str, pattern string) int {
 }
 
 // ── Kubeconfig helpers ─────────────────────────────────
-func getContexts() ([]string, error) {
-	cmd := exec.Command("kubectl", "config", "get-contexts", "-o", "name")
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get contexts: %w", err)
+// ── Kubeconfig directo (sin kubectl subprocess) ────────
+
+type kubeConfigData struct {
+	CurrentContext string
+	Contexts       []string
+}
+
+func readKubeConfig() kubeConfigData {
+	kubeconfig := os.Getenv("KUBECONFIG")
+	if kubeconfig == "" {
+		home, _ := os.UserHomeDir()
+		kubeconfig = filepath.Join(home, ".kube", "config")
 	}
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	var contexts []string
-	for _, l := range lines {
-		l = strings.TrimSpace(l)
-		if l != "" {
-			contexts = append(contexts, l)
+	data, err := os.ReadFile(kubeconfig)
+	if err != nil {
+		return kubeConfigData{}
+	}
+	var result kubeConfigData
+	lines := strings.Split(string(data), "\n")
+	inContexts := false
+	for _, line := range lines {
+		// current-context está al nivel raíz
+		if strings.HasPrefix(line, "current-context:") {
+			val := strings.TrimSpace(strings.TrimPrefix(line, "current-context:"))
+			result.CurrentContext = strings.Trim(val, "\"'")
+			continue
+		}
+		// Detectar inicio/fin del bloque contexts:
+		if line == "contexts:" {
+			inContexts = true
+			continue
+		}
+		// Salir del bloque si aparece otra clave raíz (sin indentación)
+		if inContexts && len(line) > 0 && line[0] != ' ' && line[0] != '\t' && line[0] != '-' && strings.Contains(line, ":") {
+			inContexts = false
+			continue
+		}
+		// Dentro de contexts: los nombres aparecen como "  name: valor" (2 espacios)
+		if inContexts && strings.HasPrefix(line, "  name:") {
+			name := strings.TrimSpace(strings.TrimPrefix(line, "  name:"))
+			name = strings.Trim(name, "\"'")
+			if name != "" {
+				result.Contexts = append(result.Contexts, name)
+			}
 		}
 	}
-	return contexts, nil
+	return result
+}
+
+func getContexts() ([]string, error) {
+	kc := readKubeConfig()
+	if len(kc.Contexts) == 0 {
+		return nil, fmt.Errorf("no contexts found in kubeconfig")
+	}
+	return kc.Contexts, nil
 }
 
 func getCurrentContext() string {
-	cmd := exec.Command("kubectl", "config", "current-context")
-	out, err := cmd.Output()
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(out))
+	return readKubeConfig().CurrentContext
 }
 
 func switchContext(name string) error {
@@ -667,50 +725,79 @@ func main() {
 			return
 
 		case "-h", "--help":
-			fmt.Printf(`ksw v%s - Interactive Kubernetes context switcher
+			fmt.Printf(`ksw v%s — Interactive Kubernetes context switcher
 
-Usage:
-  ksw                        Launch interactive selector (fuzzy search)
-  ksw <name>                 Switch directly to context <name> (short name ok)
-  ksw -                      Switch to previous context
-  ksw @<alias>               Switch using an alias
-  ksw history                Show recent context history
-  ksw history <n>            Switch to history entry by number
-  ksw group add <name> [ctx] Create a group (use quotes for glob: "eks-sufi*")
-  ksw group rm <name>        Remove a group
-  ksw group ls               List all groups
-  ksw group use <name>       Open TUI filtered to a group
-  ksw group add-ctx <g> <ctx> Add a context to an existing group
-  ksw group rmi <g> <ctx>  Remove a context from a group
-  ksw pin <name>             Pin a context to the top of the list
-  ksw pin rm <name>          Unpin a context
-  ksw pin ls                 List pinned contexts
-  ksw pin use                Open TUI filtered to pinned contexts only
-  ksw rename <old> <new>     Rename a context in kubeconfig
-  ksw alias <name> <context> Create alias for a context
-  ksw alias rm <name>        Remove an alias
-  ksw alias ls               List all aliases
-  ksw completion install     Auto-install completion in ~/.zshrc or ~/.bashrc
-  ksw completion zsh         Print zsh setup line
-  ksw completion bash        Print bash setup line
-  ksw ai "<query>"           Switch context using natural language (AI)
-  ksw ai chat                Interactive conversational mode (multi-turn)
-  ksw ai config              Configure AI provider (openai, claude, gemini)
-  ksw eks kubeconfig           Sync EKS clusters to kubeconfig
-  ksw eks kubeconfig --profile <name>  Sync only one AWS profile
-  ksw -l                     List contexts (non-interactive)
-  ksw -h                     Show this help
-  ksw -v                     Show version
+Context Commands:
+  ksw                              Launch interactive selector (fuzzy search)
+  ksw <name>                       Switch directly to context (short name ok)
+  ksw -                            Switch to previous context
+  ksw rename <old> <new>           Rename a context in kubeconfig
+  ksw -l                           List contexts (non-interactive)
 
-Navigation:
-  Type                Filter contexts with fuzzy search
-  ↑ / ↓               Move up / down
-  Home / End          Go to top / bottom
-  PgUp / PgDn         Jump 10 items
-  Backspace           Delete last character from filter
-  Enter               Switch to highlighted context
-  Esc                 Clear filter / Quit
-  Ctrl+C              Quit
+Alias Commands:
+  ksw @<alias>                     Switch using an alias
+  ksw alias <name> <context>       Create alias for a context
+  ksw alias rm <name>              Remove an alias
+  ksw alias ls                     List all aliases
+
+Pin Commands:
+  ksw pin <name>                   Pin a context to the top of the list
+  ksw pin rm <name>                Unpin a context
+  ksw pin ls                       List pinned contexts
+  ksw pin use                      Open TUI filtered to pinned contexts only
+
+Group Commands:
+  ksw group add <name> [ctx]       Create a group (glob ok: "eks-sufi*")
+  ksw group rm <name>              Remove a group
+  ksw group ls                     List all groups
+  ksw group use <name>             Open TUI filtered to a group
+  ksw group add-ctx <g> <ctx>      Add a context to an existing group
+  ksw group rmi <g> <ctx>          Remove a context from a group
+
+History Commands:
+  ksw history                      Show recent context history
+  ksw history <n>                  Switch to history entry by number
+
+AI Commands:
+  ksw ai "<query>"                 Switch context using natural language
+  ksw ai chat                      Interactive conversational mode
+  ksw ai config                    Configure AI provider (openai, claude, gemini)
+
+AWS Commands:                                                       [premium]
+  ksw aws sso config               Configure AWS SSO sessions (TUI)
+  ksw aws sso login                Login to default SSO session
+  ksw aws sso login <session>      Login to a specific SSO session
+  ksw aws sso profiles list        List configured AWS profiles
+  ksw aws sso profiles sync        Auto-sync SSO accounts to ~/.aws/config
+  ksw aws sso profiles add <n> <id>  Add a single profile [--session <s>]
+  ksw aws sso profiles search <t>  Search profiles by name or account ID
+
+EKS Commands:
+  ksw eks config                   Interactive EKS / kubeconfig manager (TUI)
+  ksw eks kubeconfig sync          Sync EKS clusters → ~/.kube/config
+  ksw eks kubeconfig sync --profile <n>  Sync only one AWS profile
+
+License Commands:
+  ksw license activate <key>       Activate your premium license
+  ksw license deactivate           Remove license (free slot to move machines)
+  ksw license buy                  Open checkout in browser
+  ksw license status               Show license status
+
+Shell Completion:
+  ksw completion install           Auto-install in ~/.zshrc or ~/.bashrc
+  ksw completion zsh               Print zsh setup line
+  ksw completion bash              Print bash setup line
+
+Other:
+  ksw -h, --help                   Show this help
+  ksw -v, --version                Show version
+
+Navigation (interactive mode):
+  Type          Fuzzy search    ↑ / ↓       Move up / down
+  Enter         Select          Esc         Clear filter / Quit
+  Home / End    Top / Bottom    PgUp/PgDn   Jump 10 items
+  Ctrl+P        Pin/unpin       Ctrl+F      Show pinned only
+  Ctrl+H        Short names     Ctrl+C      Quit
 
 Config stored in ~/.ksw.json
 `, version)
@@ -868,6 +955,14 @@ Config stored in ~/.ksw.json
 			handleEks()
 			return
 
+		case "aws":
+			handleAWS()
+			return
+
+		case "license":
+			handleLicense()
+			return
+
 		default:
 			arg := os.Args[1]
 
@@ -960,18 +1055,14 @@ Config stored in ~/.ksw.json
 		}
 	}
 
-	// Interactive mode
-	contexts, err := getContexts()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	// Interactive mode — lee kubeconfig una sola vez
+	kc := readKubeConfig()
+	contexts := kc.Contexts
 	if len(contexts) == 0 {
 		fmt.Fprintln(os.Stderr, "No contexts found in kubeconfig.")
 		os.Exit(1)
 	}
-
-	current := getCurrentContext()
+	current := kc.CurrentContext
 	m := initialModel(contexts, current, cfg, "", false)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())

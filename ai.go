@@ -623,6 +623,12 @@ var aiCommands = []aiCmd{
 	{"rename", `["<old>","<new>"]`, "rename a context"},
 	{"eks kubeconfig", "", "sync all EKS clusters from all AWS profiles to kubeconfig"},
 	{"eks kubeconfig --profile", `["<profile-name>"]`, "sync EKS clusters from a specific AWS profile to kubeconfig"},
+	{"eks create-profiles", "", "auto-sync all SSO accounts to ~/.aws/config (create missing AWS profiles)"},
+	{"eks add-profile", `["<profile-name>","<account-id>"]`, "add a single custom AWS profile manually to ~/.aws/config"},
+	{"eks list-profiles", "", "list all configured AWS profiles grouped by environment"},
+	{"eks search-profiles", `["<term>"]`, "search AWS profiles by name or account ID"},
+	{"eks search-sso", `["<term>"]`, "search SSO accounts by name or ID"},
+	{"eks config", "", "open TUI to configure SSO session (session name, start URL, region, role)"},
 }
 
 func aiCommandsPrompt() string {
@@ -1991,6 +1997,44 @@ func runAICommand(command string, args []string, cfg config) {
 			return
 		}
 		handleEksKubeconfig(args[0])
+
+	case "eks create-profiles":
+		handleCreateProfiles()
+
+	case "eks add-profile":
+		if len(args) < 2 {
+			fmt.Fprintf(os.Stderr, "%s eks add-profile needs profile name and account ID\n", warnStyle.Render("✗"))
+			return
+		}
+		session := ""
+		if len(args) >= 3 {
+			session = args[2]
+		}
+		handleAddProfile(args[0], args[1], session)
+
+	case "eks list-profiles":
+		handleListProfiles()
+
+	case "eks search-profiles":
+		if len(args) < 1 {
+			fmt.Fprintf(os.Stderr, "%s eks search-profiles needs a search term\n", warnStyle.Render("✗"))
+			return
+		}
+		handleSearchProfiles(args[0])
+
+	case "eks search-sso":
+		if len(args) < 1 {
+			fmt.Fprintf(os.Stderr, "%s eks search-sso needs a search term\n", warnStyle.Render("✗"))
+			return
+		}
+		handleSearchSSO(args[0])
+
+	case "eks config":
+		if inChatMode {
+			fmt.Println("No puedo abrir el TUI desde el chat. Ejecuta desde tu terminal:\n  ksw eks config")
+			return
+		}
+		handleSSOConfig()
 
 	default:
 		fmt.Fprintf(os.Stderr, "%s Command '%s' not supported via AI yet.\n", warnStyle.Render("?"), command)
