@@ -177,6 +177,35 @@ func decryptKey(encHex string) (string, error) {
 	return string(plain), nil
 }
 
+const freeTierLimit = 2
+
+// checkPremiumAccess returns true if the user has a valid license OR has free tier uses left this month.
+// If using free tier, it increments the counter and saves config.
+func checkPremiumAccess() bool {
+	if isLicenseValid() {
+		return true
+	}
+	cfg := loadConfig()
+	currentMonth := time.Now().Format("2006-01")
+	if cfg.FreeTierMonth != currentMonth {
+		cfg.FreeTierMonth = currentMonth
+		cfg.FreeTierCount = 0
+	}
+	if cfg.FreeTierCount < freeTierLimit {
+		cfg.FreeTierCount++
+		_ = saveConfig(cfg)
+		remaining := freeTierLimit - cfg.FreeTierCount
+		if remaining > 0 {
+			fmt.Println("  " + dimStyle.Render(fmt.Sprintf("Free tier: %d/%d uses this month (%d remaining)", cfg.FreeTierCount, freeTierLimit, remaining)))
+		} else {
+			fmt.Println("  " + warnStyle.Render(fmt.Sprintf("Free tier: %d/%d uses this month (last free use)", cfg.FreeTierCount, freeTierLimit)))
+		}
+		fmt.Println()
+		return true
+	}
+	return false
+}
+
 // isLicenseValid verifica la licencia — usa caché local de 24h para evitar HTTP en cada comando
 func isLicenseValid() bool {
 	cfg := loadConfig()

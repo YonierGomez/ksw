@@ -37,11 +37,12 @@ Switch contexts with natural language, manage groups, pins and aliases. Sync AWS
 - **AI natural language** — switch, create, list, rename — just describe what you want
 - **EKS kubeconfig sync** — discover and add EKS clusters to kubeconfig in parallel
 - **EKS TUI** (`ksw eks config`) — interactive manager for kubeconfig: sync, view clusters, remove stale
+- **K8s resource explorer** (`ksw k8s`) — interactive TUI to browse pods, deployments, services, nodes and more with per-cell semantic coloring, horizontal scroll, multi-select delete, label-based logs and live metrics
 - **Shell completion** — zsh and bash
 
 ### ★ Premium
 
-> Get a license at **[ksw.lemonsqueezy.com/checkout](https://ksw.lemonsqueezy.com/checkout/buy/5b89e2bc-9b58-4343-84d3-2dcbf22d67a1)**
+> **2 free uses per month** — no license needed. After that, get a license at **[ksw.lemonsqueezy.com/checkout](https://ksw.lemonsqueezy.com/checkout/buy/5b89e2bc-9b58-4343-84d3-2dcbf22d67a1)** for unlimited access.
 
 - **AWS SSO config TUI** (`ksw aws sso config`) — create, edit, delete SSO sessions, login, sync profiles and kubeconfig — all from an interactive TUI
 - **AWS SSO login** (`ksw aws sso login`) — login to any configured SSO session
@@ -116,6 +117,12 @@ ksw ai "<query>"                 # Natural language: switch, create, list, delet
 ksw ai chat                      # Interactive conversational mode (multi-turn)
 ksw ai config                    # Configure AI provider (openai, claude, gemini, bedrock)
 
+# ── AI + K8s Diagnostics ──
+ksw ai "qué pods están fallando en argocd?"
+ksw ai "muéstrame los logs del deployment argocd-server"
+ksw ai "hay eventos de error en kube-system?"
+ksw ai "qué pods consumen más CPU?"
+
 # ── Aliases ──
 ksw @<alias>                     # Switch using alias
 ksw alias <name> <context>       # Create alias
@@ -144,6 +151,14 @@ ksw history <n>                  # Switch to history entry by number
 ksw eks config                   # Interactive EKS / kubeconfig manager (TUI)
 ksw eks kubeconfig sync          # Sync EKS clusters → ~/.kube/config
 ksw eks kubeconfig sync --profile <n>  # Sync only one AWS profile
+
+# ── K8s Resource Explorer ──
+ksw k8s                          # Interactive pod explorer (default: pods)
+ksw k8s pods                     # Browse pods with live CPU/MEM metrics
+ksw k8s deployments              # Browse deployments (^l for aggregated logs)
+ksw k8s services                 # Browse services
+ksw k8s nodes                    # Browse nodes
+ksw k8s -n <namespace>           # Start in a specific namespace
 
 # ── AWS SSO [premium] ──
 ksw aws sso config               # Interactive SSO session manager (TUI)
@@ -223,6 +238,31 @@ ksw ai config         # Setup wizard: provider, model, credentials
 | Gemini (Google) | gemini-2.0-flash, etc. | API Key |
 | AWS Bedrock | Claude, Llama, etc. | AWS Profile / Access Keys / Env vars |
 
+### AI + K8s Diagnostics
+
+The AI can run `kubectl` commands to diagnose cluster issues in natural language:
+
+```bash
+ksw ai "qué pods están fallando en argocd?"
+# $ kubectl get pods -n argocd
+# $ kubectl get events -n argocd --sort-by=.lastTimestamp
+# → Finds CrashLoopBackOff pods and explains why
+
+ksw ai "muéstrame los logs del deployment argocd-server"
+# $ kubectl logs -l app=argocd-server -n argocd --tail 100 --prefix
+# → Shows aggregated logs from all pods
+
+ksw ai "qué pods consumen más CPU?"
+# $ kubectl top pods -n default
+# → Shows resource usage sorted by consumption
+
+# In chat mode, chain multiple diagnostic steps
+ksw ai chat
+> diagnose argocd namespace
+> show me the logs of that failing pod
+> what do the events say?
+```
+
 ---
 
 ## EKS Kubeconfig Sync
@@ -243,6 +283,41 @@ ksw eks kubeconfig sync
 # Sync only one profile
 ksw eks kubeconfig sync --profile payments-dev
 ```
+
+---
+
+## K8s Resource Explorer
+
+Browse and manage Kubernetes resources from an interactive TUI with semantic coloring, live metrics, horizontal scroll and multi-select operations.
+
+```bash
+# Start exploring (defaults to pods)
+ksw k8s
+
+# Browse specific resources
+ksw k8s deployments
+ksw k8s services
+ksw k8s nodes
+
+# Start in a specific namespace
+ksw k8s -n kube-system
+```
+
+### Navigation
+
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Navigate resources |
+| `←` / `→` | Scroll columns horizontally |
+| `Space` / `Tab` | Select / deselect item |
+| `Ctrl+A` | Select / deselect all |
+| `Enter` | Describe resource |
+| `Ctrl+L` | View logs (pods) or aggregated logs (deployments) |
+| `Ctrl+D` | Delete selected resources |
+| `Ctrl+N` | Change namespace |
+| `Ctrl+R` | Force refresh |
+| `/` | Search / filter |
+| `Esc` | Back / clear |
 
 ---
 
@@ -341,10 +416,11 @@ All settings are stored in `~/.ksw.json`:
 - [x] `ksw aws sso config` — AWS SSO session manager ✅
 - [x] `ksw aws sso profiles sync` — auto-sync SSO profiles ✅
 - [x] Premium licensing via Lemon Squeezy ✅
+- [x] `ksw k8s` — interactive K8s resource explorer with live metrics ✅
+- [x] Free tier — 2 premium uses/month without license ✅
 - [ ] `ksw ai` — support for local models (Ollama)
 - [ ] `ksw diff` — compare two contexts side by side
 - [ ] `ksw export` / `ksw import` — share config across machines
-- [ ] Namespace switching within a context
 - [ ] Shell prompt integration (PS1 / starship)
 
 Have an idea? [Open an issue](https://github.com/YonierGomez/ksw/issues/new) or send a PR.

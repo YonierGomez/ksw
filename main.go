@@ -14,7 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const version = "1.6.0"
+const version = "1.7.0"
 
 // ── Styles ─────────────────────────────────────────────
 var (
@@ -91,6 +91,8 @@ type config struct {
 	SSOSessions map[string]ssoConfig `json:"sso_sessions,omitempty"`
 	SSODefault  string               `json:"sso_default,omitempty"`
 	License     licenseData          `json:"license,omitempty"`
+	FreeTierMonth string              `json:"free_tier_month,omitempty"` // "2026-04"
+	FreeTierCount int                 `json:"free_tier_count,omitempty"` // uses this month
 }
 
 type ssoConfig struct {
@@ -772,6 +774,13 @@ AWS Commands:                                                       [premium]
   ksw aws sso profiles add <n> <id>  Add a single profile [--session <s>]
   ksw aws sso profiles search <t>  Search profiles by name or account ID
 
+K8s Dashboard:
+  ksw k8s                         Interactive K8s resource explorer (TUI)
+  ksw k8s pods                    Jump directly to pods view
+  ksw k8s deploy                  Jump directly to deployments view
+  ksw k8s -n <namespace>          Open in a specific namespace
+  ksw k8s pods -n kube-system     Combine resource + namespace
+
 EKS Commands:
   ksw eks config                   Interactive EKS / kubeconfig manager (TUI)
   ksw eks kubeconfig sync          Sync EKS clusters → ~/.kube/config
@@ -953,6 +962,10 @@ Config stored in ~/.ksw.json
 
 		case "eks":
 			handleEks()
+			return
+
+		case "k8s":
+			handleK8sTUI(os.Args[2:])
 			return
 
 		case "aws":

@@ -46,7 +46,7 @@
     },
     "url": "https://yoniergomez.github.io/ksw/",
     "downloadUrl": "https://github.com/YonierGomez/ksw/releases",
-    "softwareVersion": "1.6.0",
+    "softwareVersion": "1.7.0",
     "license": "https://github.com/YonierGomez/ksw/blob/main/LICENSE"
   }
   </script>
@@ -793,7 +793,7 @@
 
 <!-- HERO -->
 <section class="hero">
-  <div class="badge">⎈ v1.6.0 · AI-Powered · AWS SSO</div>
+  <div class="badge">⎈ v1.7.0 · AI-Powered · AWS SSO</div>
   <h1>Switch Kubernetes<br/>contexts <span class="accent">instantly</span></h1>
   <p>Blazing-fast TUI for Kubernetes contexts with AI natural language, <span style="color:var(--cyan); font-weight:600;">EKS kubeconfig sync</span>, and <span style="color:var(--yellow); font-weight:600;">AWS SSO management</span>. Available for <strong style="color:var(--cyan)">macOS</strong> and <strong style="color:var(--green)">Linux</strong>.</p>
   <div class="hero-actions">
@@ -993,6 +993,11 @@
       <h3>Full State Awareness</h3>
       <p>The AI knows your current context, all groups, pins, aliases and history. It gives personalized, accurate answers every time.</p>
     </div>
+    <div class="feature-card" style="border-color: rgba(255,85,85,.3); background: linear-gradient(135deg, var(--bg2), rgba(255,85,85,.05));">
+      <div class="feature-icon">🩺</div>
+      <h3>AI K8s Diagnostics</h3>
+      <p><code style="color:var(--red);font-family:'JetBrains Mono',monospace;">ksw ai "why is my pod crashing?"</code> — the AI runs kubectl commands (get pods, describe, logs, events, top) and analyzes the output to diagnose issues in natural language.</p>
+    </div>
     <div class="feature-card" style="border-color: rgba(80,250,123,.3); background: linear-gradient(135deg, var(--bg2), rgba(80,250,123,.05));">
       <div class="feature-icon">☁️</div>
       <h3>EKS Kubeconfig Sync</h3>
@@ -1002,6 +1007,16 @@
       <div class="feature-icon">⎈</div>
       <h3>EKS TUI</h3>
       <p><code style="color:var(--green);font-family:'JetBrains Mono',monospace;">ksw eks config</code> opens an interactive manager: sync all profiles, sync a specific profile with live search, view clusters in kubeconfig, remove stale entries, or wipe everything — all with real-time streaming progress.</p>
+    </div>
+    <div class="feature-card" style="border-color: rgba(0,212,255,.3); background: linear-gradient(135deg, var(--bg2), rgba(0,212,255,.05));">
+      <div class="feature-icon">🔍</div>
+      <h3>K8s Resource Explorer</h3>
+      <p><code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">ksw k8s</code> — browse pods, deployments, services and more with live CPU/MEM metrics, semantic coloring, horizontal scroll, multi-select delete, label-based aggregated logs and namespace switching.</p>
+    </div>
+    <div class="feature-card" style="border-color: rgba(241,250,140,.3); background: linear-gradient(135deg, var(--bg2), rgba(241,250,140,.05));">
+      <div class="feature-icon">🎁</div>
+      <h3>Free Tier</h3>
+      <p>Premium features include <strong style="color:var(--yellow);">2 free uses per month</strong> — no license needed. Try AWS SSO config, login and profile sync before committing. After that, upgrade for unlimited access.</p>
     </div>
   </div>
 </section>
@@ -1203,7 +1218,7 @@
 <!-- FOOTER -->
 <footer>
   <div class="footer-logo">⎈ <span>ksw</span></div>
-  <p>AI-Powered Kubernetes context switcher · v1.6.0</p>
+  <p>AI-Powered Kubernetes context switcher · v1.7.0</p>
   <ul class="footer-links">
     <li><a href="https://github.com/YonierGomez/ksw" target="_blank">GitHub</a></li>
     <li><a href="https://github.com/YonierGomez/ksw/releases" target="_blank">Releases</a></li>
