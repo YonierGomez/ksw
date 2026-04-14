@@ -662,7 +662,7 @@ func handleAWSSSO(args []string) {
 	}
 
 	// ── Premium gate ──────────────────────────────────────
-	if !isLicenseValid() {
+	if !checkPremiumAccess() {
 		buyURL := "https://ksw.lemonsqueezy.com/checkout/buy/5b89e2bc-9b58-4343-84d3-2dcbf22d67a1"
 		// OSC 8 hyperlink — clickeable en iTerm2, Terminal.app, VSCode
 		clickable := "\033]8;;" + buyURL + "\033\\" + buyURL + "\033]8;;\033\\"

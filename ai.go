@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -236,6 +237,21 @@ func runAIQuery(query string, contexts []string, cfg *config, chatMode bool) boo
 			} else {
 				fmt.Printf("%s\n", replyErr.reply)
 			}
+			return true
+		}
+		if kubectlErr, ok := err.(*aiKubectlError); ok {
+			cmdStr := "kubectl " + strings.Join(kubectlErr.args, " ")
+			fmt.Printf("%s %s\n", dimStyle.Render("$"), dimStyle.Render(cmdStr))
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			out, execErr := exec.CommandContext(ctx, "kubectl", kubectlErr.args...).CombinedOutput()
+			output := strings.TrimSpace(string(out))
+			if execErr != nil {
+				fmt.Fprintf(os.Stderr, "%s\n", output)
+			} else {
+				fmt.Println(output)
+			}
+			saveMemory(cfg, query, "kubectl", cmdStr)
 			return true
 		}
 		fmt.Fprintf(os.Stderr, "%s %v\n", warnStyle.Render("✗"), err)
@@ -547,6 +563,27 @@ func executeAction(act aiResponse, contexts []string, cfg *config) {
 		runAICommand(act.Command, act.Args, *cfg)
 		// Reload config in case command modified it
 		*cfg = loadConfig()
+	case "kubectl":
+		// Execute kubectl command and show output
+		args := act.Args
+		if len(args) == 0 && act.Command != "" {
+			// parse command string into args
+			args = strings.Fields(act.Command)
+		}
+		if len(args) == 0 {
+			fmt.Fprintf(os.Stderr, "%s No kubectl command specified\n", warnStyle.Render("✗"))
+			return
+		}
+		fmt.Printf("%s %s\n", dimStyle.Render("$"), dimStyle.Render("kubectl "+strings.Join(args, " ")))
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		out, err := exec.CommandContext(ctx, "kubectl", args...).CombinedOutput()
+		output := strings.TrimSpace(string(out))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", output)
+		} else {
+			fmt.Println(output)
+		}
 	case "switch":
 		chosen, err := resolveExactOrFuzzy(act.Context, contexts)
 		if err != nil {
@@ -629,6 +666,15 @@ var aiCommands = []aiCmd{
 	{"eks search-profiles", `["<term>"]`, "search AWS profiles by name or account ID"},
 	{"eks search-sso", `["<term>"]`, "search SSO accounts by name or ID"},
 	{"eks config", "", "open TUI to configure SSO session (session name, start URL, region, role)"},
+	// K8s diagnostic commands — AI can run kubectl to diagnose issues
+	{"kubectl get", `["<resource>","-n","<namespace>"]`, "get k8s resources (pods, deployments, services, nodes, events, etc.)"},
+	{"kubectl describe", `["<resource>","<name>","-n","<namespace>"]`, "describe a k8s resource in detail"},
+	{"kubectl logs", `["<pod-name>","-n","<namespace>","--tail","100"]`, "get pod logs (add --previous for crashed pods)"},
+	{"kubectl logs -l", `["app=<name>","-n","<namespace>","--tail","100"]`, "get logs by label selector (all pods of a deployment)"},
+	{"kubectl top pods", `["-n","<namespace>"]`, "show CPU/MEM usage of pods"},
+	{"kubectl top nodes", `[]`, "show CPU/MEM usage of nodes"},
+	{"kubectl get events", `["-n","<namespace>","--sort-by=.lastTimestamp"]`, "get recent events (useful for debugging)"},
+	{"kubectl get pods", `["-n","<namespace>","-o","wide"]`, "get pods with node and IP info"},
 }
 
 func aiCommandsPrompt() string {
@@ -1043,8 +1089,16 @@ type aiReplyError struct {
 	reply string
 }
 
+type aiKubectlError struct {
+	args []string
+}
+
 func (e *aiReplyError) Error() string {
 	return "reply:" + e.reply
+}
+
+func (e *aiKubectlError) Error() string {
+	return "kubectl:" + strings.Join(e.args, " ")
 }
 
 // aiMultiError holds multiple actions to execute sequentially
@@ -1175,6 +1229,12 @@ func resolveContextWithAI(query string, contexts []string, cfg config) (string, 
 	switch resp.Action {
 	case "command":
 		return "", string(jsonStr), &aiCommandError{command: resp.Command, args: resp.Args}
+	case "kubectl":
+		args := resp.Args
+		if len(args) == 0 && resp.Command != "" {
+			args = strings.Fields(resp.Command)
+		}
+		return "", string(jsonStr), &aiKubectlError{args: args}
 	case "switch":
 		result, err := resolveExactOrFuzzy(resp.Context, contexts)
 		return result, string(jsonStr), err
@@ -1301,10 +1361,20 @@ func buildPrompt(query string, contexts []string, cfg config) string {
 	currentCtx := getCurrentContext()
 	currentShort := shortName(currentCtx)
 
+	// Get current k8s namespace for diagnostic context
+	currentNs := "default"
+	if nsOut, err := exec.Command("kubectl", "config", "view", "--minify", "--output", "jsonpath={.contexts[0].context.namespace}").Output(); err == nil {
+		if ns := strings.TrimSpace(string(nsOut)); ns != "" {
+			currentNs = ns
+		}
+	}
+
 	return fmt.Sprintf(`You are "ksw ai", an intelligent Kubernetes context switcher assistant created by Yonier Gomez.
 You have full knowledge of the user's configuration and can manage everything.
+You can also diagnose Kubernetes issues by running kubectl commands.
 
 CURRENT CONTEXT: %s
+CURRENT NAMESPACE: %s
 TOTAL CONTEXTS: %d
 %s%s
 RESPONSE FORMAT:
@@ -1318,6 +1388,10 @@ ACTIONS:
 1. Switch context: {"action":"switch","context":"<exact short name from list>"}
 2. Run command: {"action":"command","command":"<cmd>","args":["arg1","arg2",...]}
 3. Free reply: {"action":"reply","reply":"<your answer in the user's language>"}
+4. Run kubectl: {"action":"kubectl","args":["get","pods","-n","default"]}
+   Use this for K8s diagnostics: get pods, describe, logs, events, top, etc.
+   You can chain multiple kubectl calls to investigate issues.
+   When diagnosing, first gather info (get pods, events), then analyze and reply with findings.
 
 AVAILABLE COMMANDS (these execute real actions):
 %s
@@ -1342,7 +1416,7 @@ Request: %s
 Contexts:
 %s
 
-JSON:`, currentShort, len(contexts), stateBlock, memoryBlock, aiCommandsPrompt(), query, list)
+JSON:`, currentShort, currentNs, len(contexts), stateBlock, memoryBlock, aiCommandsPrompt(), query, list)
 }
 
 func preFilterContexts(query string, contexts []string) []string {
