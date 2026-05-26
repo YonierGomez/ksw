@@ -14,7 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const version = "1.7.1"
+const version = "1.7.2"
 
 // ── Styles ─────────────────────────────────────────────
 var (
@@ -787,7 +787,6 @@ AWS Commands:                                                       [premium]
   ksw aws sso login <session>      Login to a specific SSO session
   ksw aws sso profiles list        List configured AWS profiles
   ksw aws sso profiles sync        Auto-sync SSO accounts to ~/.aws/config
-  ksw aws sso profiles sync --session <n>  Sync only one SSO session
   ksw aws sso profiles add <n> <id>  Add a single profile [--session <s>]
   ksw aws sso profiles search <t>  Search profiles by name or account ID
 

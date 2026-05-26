@@ -191,10 +191,7 @@ func isValidAccountID(id string) bool {
 // ── Obtener cuentas desde AWS SSO ──────────────────────
 
 func loadSSOAccounts() ([]ssoAccount, error) {
-	return loadSSOAccountsFor(loadSSOSettings())
-}
-
-func loadSSOAccountsFor(ssoCfg ssoConfig) ([]ssoAccount, error) {
+	ssoCfg := loadSSOSettings()
 	cmd := exec.Command("aws", "sso", "list-accounts", "--region", ssoCfg.Region)
 	cmd.Env = append(os.Environ(), "AWS_PAGER=")
 	out, err := cmd.Output()
@@ -596,7 +593,7 @@ func updateAccountIDInConfig(profileName, oldID, newID string) error {
 
 // ── Comando: ksw eks create-profiles (auto sync) ──────
 
-func handleCreateProfiles(sessionName string) {
+func handleCreateProfiles() {
 	fmt.Println(logoStyle.Render("⎈ ksw eks create-profiles"))
 	fmt.Println()
 
@@ -605,18 +602,14 @@ func handleCreateProfiles(sessionName string) {
 		os.Exit(1)
 	}
 
-	ssoCfg := loadSSOSettingsFor(sessionName)
-	if err := ensureSSOSessionFor(ssoCfg); err != nil {
+	if err := ensureSSOSession(); err != nil {
 		fmt.Fprintf(os.Stderr, "%s Cannot ensure SSO session: %s\n", warnStyle.Render("✗"), err)
 		os.Exit(1)
-	}
-	if sessionName != "" {
-		fmt.Printf("  %s Session: %s\n", dimStyle.Render("·"), ssoCfg.SessionName)
 	}
 
 	// Obtener cuentas SSO
 	fmt.Printf("  %s Fetching SSO accounts...\n", dimStyle.Render("⟳"))
-	ssoAccounts, err := loadSSOAccountsFor(ssoCfg)
+	ssoAccounts, err := loadSSOAccounts()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s %s\n", warnStyle.Render("✗"), err)
 		os.Exit(1)
