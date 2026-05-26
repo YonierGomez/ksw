@@ -2073,7 +2073,7 @@ func runAICommand(command string, args []string, cfg config) {
 		handleEksKubeconfig(args[0])
 
 	case "eks create-profiles":
-		handleCreateProfiles()
+		handleCreateProfiles("")
 
 	case "eks add-profile":
 		if len(args) < 2 {

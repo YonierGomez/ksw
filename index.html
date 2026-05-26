@@ -46,7 +46,7 @@
     },
     "url": "https://yoniergomez.github.io/ksw/",
     "downloadUrl": "https://github.com/YonierGomez/ksw/releases",
-    "softwareVersion": "1.7.0",
+    "softwareVersion": "1.7.1",
     "license": "https://github.com/YonierGomez/ksw/blob/main/LICENSE"
   }
   </script>
@@ -783,7 +783,7 @@
   <ul class="nav-links">
     <li><a href="#features">Features</a></li>
     <li><a href="#ai">AI</a></li>
-    <li><a href="#premium">Premium</a></li>
+    <li><a href="#sponsor">Sponsor</a></li>
     <li><a href="#install">Install</a></li>
     <li><a href="#usage">Usage</a></li>
     <li><a href="https://github.com/YonierGomez/ksw" target="_blank">GitHub</a></li>
@@ -793,7 +793,7 @@
 
 <!-- HERO -->
 <section class="hero">
-  <div class="badge">⎈ v1.7.0 · AI-Powered · AWS SSO</div>
+  <div class="badge">⎈ v1.7.1 · AI-Powered · AWS SSO</div>
   <h1>Switch Kubernetes<br/>contexts <span class="accent">instantly</span></h1>
   <p>Blazing-fast TUI for Kubernetes contexts with AI natural language, <span style="color:var(--cyan); font-weight:600;">EKS kubeconfig sync</span>, and <span style="color:var(--yellow); font-weight:600;">AWS SSO management</span>. Available for <strong style="color:var(--cyan)">macOS</strong> and <strong style="color:var(--green)">Linux</strong>.</p>
   <div class="hero-actions">
@@ -1014,69 +1014,54 @@
       <p><code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">ksw k8s</code> — browse pods, deployments, services and more with live CPU/MEM metrics, semantic coloring, horizontal scroll, multi-select delete, label-based aggregated logs and namespace switching.</p>
     </div>
     <div class="feature-card" style="border-color: rgba(241,250,140,.3); background: linear-gradient(135deg, var(--bg2), rgba(241,250,140,.05));">
-      <div class="feature-icon">🎁</div>
-      <h3>Free Tier</h3>
-      <p>Premium features include <strong style="color:var(--yellow);">2 free uses per month</strong> — no license needed. Try AWS SSO config, login and profile sync before committing. After that, upgrade for unlimited access.</p>
+      <div class="feature-icon">🔐</div>
+      <h3>AWS SSO</h3>
+      <p><code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">ksw aws sso config</code> — manage SSO sessions, login, auto-sync all accounts and roles to <code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">~/.aws/config</code> with live progress. Fully free.</p>
     </div>
   </div>
 </section>
 
-<!-- PREMIUM -->
-<section class="premium-section" id="premium">
+<!-- SPONSOR -->
+<section class="premium-section" id="sponsor">
   <div class="premium-inner">
     <div style="text-align:center;">
-      <div class="premium-badge-label">★ Premium</div>
-      <h2 class="section-title" style="margin-top:.4rem;">AWS SSO — fully integrated</h2>
-      <p class="section-sub">Manage AWS SSO sessions, auto-sync profiles and kubeconfig from a single interactive TUI. Included in the ksw premium license.</p>
+      <div class="premium-badge-label">☕ Sponsor</div>
+      <h2 class="section-title" style="margin-top:.4rem;">Support ksw development</h2>
+      <p class="section-sub">ksw is free and open source. If it saves you time, consider sponsoring to keep it growing.</p>
     </div>
 
-    <div class="premium-grid stagger">
+    <div class="premium-grid stagger" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
       <div class="premium-card">
-        <div class="feature-icon">🔐</div>
-        <h3>SSO Session Manager</h3>
-        <p><code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">ksw aws sso config</code> — create, edit, delete AWS SSO sessions and see their real-time token status (remaining time, expiry) in an interactive TUI.</p>
+        <div class="feature-icon">🎯</div>
+        <h3>Direct Support</h3>
+        <p>Get priority responses to issues and questions directly from the creator. Your problems get solved first.</p>
       </div>
       <div class="premium-card">
         <div class="feature-icon">🚀</div>
-        <h3>One-Click Login</h3>
-        <p>Login to any SSO session from inside the TUI — <code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">aws sso login</code> runs within the TUI and returns to the menu automatically upon completion.</p>
+        <h3>Influence the Roadmap</h3>
+        <p>Request features and get them prioritized. Sponsors shape what gets built next.</p>
       </div>
       <div class="premium-card">
-        <div class="feature-icon">⚡</div>
-        <h3>Profile Sync</h3>
-        <p>Auto-scan all SSO accounts and roles, then write missing profiles to <code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">~/.aws/config</code> with live streaming progress and a cyan progress bar. Ultra-fast with goroutines.</p>
-      </div>
-      <div class="premium-card">
-        <div class="feature-icon">🗂️</div>
-        <h3>Profile Management</h3>
-        <p>List, add, and search AWS profiles from the command line. <code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">ksw aws sso profiles list</code>, <code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">sync</code>, <code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">search</code> — organized under a clean subcommand tree.</p>
-      </div>
-      <div class="premium-card">
-        <div class="feature-icon">☸️</div>
-        <h3>Kubeconfig Sync from SSO</h3>
-        <p>After syncing profiles, trigger a full kubeconfig sync directly from the SSO TUI — same parallel speed as <code style="color:var(--yellow);font-family:'JetBrains Mono',monospace;">ksw eks config</code>, with streaming output and progress bar.</p>
-      </div>
-      <div class="premium-card">
-        <div class="feature-icon">🔒</div>
-        <h3>Secure License</h3>
-        <p>Perpetual license per user. Key is encrypted at rest with AES-GCM and a machine fingerprint. Validated online with a 24h local cache — no slowdowns. Deactivate any time to move machines.</p>
+        <div class="feature-icon">❤️</div>
+        <h3>Keep it Free</h3>
+        <p>Your contribution keeps ksw free and open source for everyone. No paywalls, no feature locks.</p>
       </div>
     </div>
 
-    <div style="text-align:center;">
-      <a href="https://ksw.lemonsqueezy.com/checkout/buy/5b89e2bc-9b58-4343-84d3-2dcbf22d67a1" target="_blank" class="premium-cta">★ Get Premium</a>
+    <div style="text-align:center; display:flex; gap:1rem; justify-content:center; flex-wrap:wrap; margin-top:1.5rem;">
+      <a href="https://buymeacoffee.com/yoniergomez" target="_blank" class="premium-cta" style="background:linear-gradient(135deg,#FFDD00,#FFA500); color:#000;">☕ Buy me a coffee</a>
+      <a href="https://github.com/sponsors/YonierGomez" target="_blank" class="premium-cta" style="background:linear-gradient(135deg,#ea4aaa,#a855f7);">♥ GitHub Sponsors</a>
     </div>
 
     <div class="license-box">
-      <div class="license-box-header">★ activate license</div>
+      <div class="license-box-header">★ sponsor with a license key</div>
       <div class="license-box-body">
         <div><span class="cmd">$ ksw license activate</span></div>
         <div><span style="color:#555;">  Enter license key: ************************************</span></div>
-        <div><span class="out">  ✔ License activated successfully!</span></div>
+        <div><span class="out">  ✔ License activated — thank you for supporting ksw!</span></div>
         <div><span style="color:#555;">  Registered to: you@company.com</span></div>
         <div>&nbsp;</div>
-        <div><span class="out">  ★ All premium features are now unlocked.</span></div>
-        <div><span style="color:#555;">  Get started: ksw aws sso config</span></div>
+        <div><span style="color:#555;">  Get a key: </span><span class="out">ksw.lemonsqueezy.com/checkout</span></div>
       </div>
     </div>
   </div>
@@ -1218,7 +1203,7 @@
 <!-- FOOTER -->
 <footer>
   <div class="footer-logo">⎈ <span>ksw</span></div>
-  <p>AI-Powered Kubernetes context switcher · v1.7.0</p>
+  <p>AI-Powered Kubernetes context switcher · v1.7.1</p>
   <ul class="footer-links">
     <li><a href="https://github.com/YonierGomez/ksw" target="_blank">GitHub</a></li>
     <li><a href="https://github.com/YonierGomez/ksw/releases" target="_blank">Releases</a></li>

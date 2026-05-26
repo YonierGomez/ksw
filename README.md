@@ -38,16 +38,11 @@ Switch contexts with natural language, manage groups, pins and aliases. Sync AWS
 - **EKS kubeconfig sync** — discover and add EKS clusters to kubeconfig in parallel
 - **EKS TUI** (`ksw eks config`) — interactive manager for kubeconfig: sync, view clusters, remove stale
 - **K8s resource explorer** (`ksw k8s`) — interactive TUI to browse pods, deployments, services, nodes and more with per-cell semantic coloring, horizontal scroll, multi-select delete, label-based logs and live metrics
-- **Shell completion** — zsh and bash
-
-### ★ Premium
-
-> **2 free uses per month** — no license needed. After that, get a license at **[ksw.lemonsqueezy.com/checkout](https://ksw.lemonsqueezy.com/checkout/buy/5b89e2bc-9b58-4343-84d3-2dcbf22d67a1)** for unlimited access.
-
 - **AWS SSO config TUI** (`ksw aws sso config`) — create, edit, delete SSO sessions, login, sync profiles and kubeconfig — all from an interactive TUI
 - **AWS SSO login** (`ksw aws sso login`) — login to any configured SSO session
 - **Profile sync** (`ksw aws sso profiles sync`) — auto-scan SSO accounts and sync all profiles to `~/.aws/config` with live progress
 - **Profile management** (`ksw aws sso profiles list/add/search`) — list, add and search AWS profiles
+- **Shell completion** — zsh and bash
 
 ---
 
@@ -160,7 +155,7 @@ ksw k8s services                 # Browse services
 ksw k8s nodes                    # Browse nodes
 ksw k8s -n <namespace>           # Start in a specific namespace
 
-# ── AWS SSO [premium] ──
+# ── AWS SSO ──
 ksw aws sso config               # Interactive SSO session manager (TUI)
 ksw aws sso login                # Login to default SSO session
 ksw aws sso login <session>      # Login to a specific SSO session
@@ -321,14 +316,11 @@ ksw k8s -n kube-system
 
 ---
 
-## AWS SSO — Premium
+## AWS SSO
 
 Manage AWS SSO sessions and profiles from an interactive TUI. Automatically sync all accounts and roles to `~/.aws/config`.
 
 ```bash
-# Activate license first
-ksw license activate
-
 # Interactive TUI — sessions, login, sync profiles, sync kubeconfig
 ksw aws sso config
 
@@ -339,6 +331,9 @@ ksw aws sso login my-session
 # Sync all SSO accounts to ~/.aws/config
 ksw aws sso profiles sync
 
+# Sync only one SSO session
+ksw aws sso profiles sync --session my-session
+
 # List / search profiles
 ksw aws sso profiles list
 ksw aws sso profiles search payments
@@ -346,26 +341,26 @@ ksw aws sso profiles search payments
 
 ---
 
-## License (Premium)
+## Sponsor
+
+ksw is free and open source. If it saves you time, consider sponsoring to support continued development.
+
+**[☕ Buy me a coffee](https://buymeacoffee.com/yoniergomez)** · **[GitHub Sponsors](https://github.com/sponsors/YonierGomez)**
+
+Want to go further? Grab a license key as a one-time sponsor contribution:
+
+- 🎯 **Direct support** from the creator — priority responses to issues and questions
+- 🚀 **Influence the roadmap** — request features and get them prioritized
 
 ```bash
-# Activate (interactive — key is hidden)
-ksw license activate
-
-# Activate with key directly
-ksw license activate XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
-
-# Check status
-ksw license status
-
-# Moving to a new machine? Deactivate first to free the slot
-ksw license deactivate
-
-# Open checkout in browser
-ksw license buy
+ksw license activate             # Activate interactively (key hidden)
+ksw license activate <key>       # Activate with key as argument
+ksw license status               # Show license status
+ksw license deactivate           # Remove license (frees slot to move to another machine)
+ksw license buy                  # Open checkout in browser
 ```
 
-Get a license at **[ksw.lemonsqueezy.com/checkout](https://ksw.lemonsqueezy.com/checkout/buy/5b89e2bc-9b58-4343-84d3-2dcbf22d67a1)**
+Get a key at **[ksw.lemonsqueezy.com/checkout](https://ksw.lemonsqueezy.com/checkout/buy/5b89e2bc-9b58-4343-84d3-2dcbf22d67a1)**
 
 ---
 
@@ -407,7 +402,7 @@ All settings are stored in `~/.ksw.json`:
 - `kubectl` installed and configured
 - For `ksw ai` with AWS Bedrock: `aws` CLI installed and configured
 - For `ksw eks kubeconfig sync`: `aws` CLI with profiles in `~/.aws/config`
-- For `ksw aws sso`: premium license + `aws` CLI
+- For `ksw aws sso`: `aws` CLI installed and configured
 
 ## Roadmap
 
@@ -415,9 +410,7 @@ All settings are stored in `~/.ksw.json`:
 - [x] `ksw eks config` — interactive EKS / kubeconfig TUI ✅
 - [x] `ksw aws sso config` — AWS SSO session manager ✅
 - [x] `ksw aws sso profiles sync` — auto-sync SSO profiles ✅
-- [x] Premium licensing via Lemon Squeezy ✅
 - [x] `ksw k8s` — interactive K8s resource explorer with live metrics ✅
-- [x] Free tier — 2 premium uses/month without license ✅
 - [ ] `ksw ai` — support for local models (Ollama)
 - [ ] `ksw diff` — compare two contexts side by side
 - [ ] `ksw export` / `ksw import` — share config across machines
