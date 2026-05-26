@@ -595,7 +595,7 @@ func handleEks() {
 		}
 
 	case "create-profiles":
-		handleCreateProfiles()
+		handleCreateProfiles("")
 
 	default:
 		fmt.Fprintf(os.Stderr, "%s Unknown subcommand: ksw eks %s\n", warnStyle.Render("✗"), args[0])
@@ -607,34 +607,37 @@ func handleEks() {
 var awsUsage = `%s
 
 Usage:
-  ksw aws sso config                      Configure AWS SSO sessions (TUI)
-  ksw aws sso login                       Login to default SSO session
-  ksw aws sso login <session>             Login to a specific SSO session
-  ksw aws sso profiles list               List configured AWS profiles
-  ksw aws sso profiles sync               Auto-sync SSO accounts to ~/.aws/config
-  ksw aws sso profiles add <name> <id>    Add a single profile [--session <s>]
-  ksw aws sso profiles search <term>      Search profiles by name or account ID
+  ksw aws sso config                               Configure AWS SSO sessions (TUI)
+  ksw aws sso login                                Login to default SSO session
+  ksw aws sso login <session>                      Login to a specific SSO session
+  ksw aws sso profiles list                        List configured AWS profiles
+  ksw aws sso profiles sync                        Auto-sync SSO accounts to ~/.aws/config
+  ksw aws sso profiles sync --session <name>       Sync only one SSO session
+  ksw aws sso profiles add <name> <id>             Add a single profile [--session <s>]
+  ksw aws sso profiles search <term>               Search profiles by name or account ID
 `
 
 var ssoUsage = `%s
 
 Usage:
-  ksw aws sso config                      Configure AWS SSO sessions (TUI)
-  ksw aws sso login                       Login to default SSO session
-  ksw aws sso login <session>             Login to a specific SSO session
-  ksw aws sso profiles list               List configured AWS profiles
-  ksw aws sso profiles sync               Auto-sync SSO accounts to ~/.aws/config
-  ksw aws sso profiles add <name> <id>    Add a single profile [--session <s>]
-  ksw aws sso profiles search <term>      Search profiles by name or account ID
+  ksw aws sso config                               Configure AWS SSO sessions (TUI)
+  ksw aws sso login                                Login to default SSO session
+  ksw aws sso login <session>                      Login to a specific SSO session
+  ksw aws sso profiles list                        List configured AWS profiles
+  ksw aws sso profiles sync                        Auto-sync SSO accounts to ~/.aws/config
+  ksw aws sso profiles sync --session <name>       Sync only one SSO session
+  ksw aws sso profiles add <name> <id>             Add a single profile [--session <s>]
+  ksw aws sso profiles search <term>               Search profiles by name or account ID
 `
 
 var ssoProfilesUsage = `%s
 
 Usage:
-  ksw aws sso profiles list               List configured AWS profiles
-  ksw aws sso profiles sync               Auto-sync SSO accounts to ~/.aws/config
-  ksw aws sso profiles add <name> <id>    Add a single profile [--session <s>]
-  ksw aws sso profiles search <term>      Search profiles by name or account ID
+  ksw aws sso profiles list                        List configured AWS profiles
+  ksw aws sso profiles sync                        Auto-sync SSO accounts to ~/.aws/config
+  ksw aws sso profiles sync --session <name>       Sync only one SSO session
+  ksw aws sso profiles add <name> <id>             Add a single profile [--session <s>]
+  ksw aws sso profiles search <term>               Search profiles by name or account ID
 `
 
 func handleAWS() {
@@ -661,21 +664,6 @@ func handleAWSSSO(args []string) {
 		return
 	}
 
-	// ── Premium gate ──────────────────────────────────────
-	if !checkPremiumAccess() {
-		buyURL := "https://ksw.lemonsqueezy.com/checkout/buy/5b89e2bc-9b58-4343-84d3-2dcbf22d67a1"
-		// OSC 8 hyperlink — clickeable en iTerm2, Terminal.app, VSCode
-		clickable := "\033]8;;" + buyURL + "\033\\" + buyURL + "\033]8;;\033\\"
-		fmt.Println(logoStyle.Render("⎈ ksw aws sso") + "  " + warnStyle.Render("[ premium ]"))
-		fmt.Println()
-		fmt.Println("  " + warnStyle.Render("✗") + " This feature requires a valid license.")
-		fmt.Println()
-		fmt.Println("  " + dimStyle.Render("Activate with: ksw license activate <your-key>"))
-		fmt.Println("  " + dimStyle.Render("Get a license: "+clickable))
-		fmt.Println("  " + dimStyle.Render("Or run:        ksw license buy"))
-		os.Exit(1)
-	}
-
 	switch args[0] {
 	case "config":
 		handleSSOConfig()
@@ -700,7 +688,14 @@ func handleAWSSSO_Profiles(args []string) {
 	case "list", "ls":
 		handleListProfiles()
 	case "sync":
-		handleCreateProfiles()
+		session := ""
+		for i := 1; i < len(args); i++ {
+			if args[i] == "--session" && i+1 < len(args) {
+				session = args[i+1]
+				break
+			}
+		}
+		handleCreateProfiles(session)
 	case "add":
 		if len(args) < 3 {
 			fmt.Fprintf(os.Stderr, "%s Usage: ksw aws sso profiles add <name> <account-id> [--session <s>]\n", warnStyle.Render("✗"))

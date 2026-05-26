@@ -14,7 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const version = "1.7.0"
+const version = "1.7.1"
 
 // ── Styles ─────────────────────────────────────────────
 var (
@@ -172,6 +172,7 @@ type scored struct {
 
 // fuzzyMatch returns a score > 0 if pattern fuzzy-matches str.
 // Higher score = better match. 0 = no match.
+// Precision-focused: requires matches to be clustered (low gap penalty).
 func fuzzyMatch(str, pattern string) int {
 	str = strings.ToLower(str)
 	pattern = strings.ToLower(pattern)
@@ -179,6 +180,16 @@ func fuzzyMatch(str, pattern string) int {
 	pLen := utf8.RuneCountInString(pattern)
 	if pLen == 0 {
 		return 1
+	}
+
+	// Exact substring: highest priority
+	if strings.Contains(str, pattern) {
+		idx := strings.Index(str, pattern)
+		score := 200
+		if idx == 0 {
+			score += 50
+		}
+		return score
 	}
 
 	sRunes := []rune(str)
@@ -193,33 +204,38 @@ func fuzzyMatch(str, pattern string) int {
 		}
 	}
 	if pi < pLen {
-		return 0 // not all chars matched
+		return 0
 	}
 
-	// Score: bonus for consecutive matches, word boundary matches, and early matches
+	// Score with gap penalty to enforce clustering
 	score := 0
 	pi = 0
 	consecutive := 0
+	lastMatchSi := -1
 	for si := 0; si < sLen && pi < pLen; si++ {
 		if sRunes[si] == pRunes[pi] {
 			pi++
 			consecutive++
-			score += 10 + consecutive*5 // consecutive bonus
+			score += 10 + consecutive*5
 
-			// Word boundary bonus (after /, -, _, or start)
+			// Word boundary bonus
 			if si == 0 || sRunes[si-1] == '/' || sRunes[si-1] == '-' || sRunes[si-1] == '_' {
 				score += 20
 			}
-			// Early match bonus
-			score += max(0, 5-si)
+			// Gap penalty: penalize skipped characters between matches
+			if lastMatchSi >= 0 {
+				gap := si - lastMatchSi - 1
+				score -= gap * 3
+			}
+			lastMatchSi = si
 		} else {
 			consecutive = 0
 		}
 	}
 
-	// Exact substring bonus
-	if strings.Contains(str, pattern) {
-		score += 50
+	// Require minimum score to avoid low-quality scattered matches
+	if score < 15 {
+		return 0
 	}
 
 	return score
@@ -771,6 +787,7 @@ AWS Commands:                                                       [premium]
   ksw aws sso login <session>      Login to a specific SSO session
   ksw aws sso profiles list        List configured AWS profiles
   ksw aws sso profiles sync        Auto-sync SSO accounts to ~/.aws/config
+  ksw aws sso profiles sync --session <n>  Sync only one SSO session
   ksw aws sso profiles add <n> <id>  Add a single profile [--session <s>]
   ksw aws sso profiles search <t>  Search profiles by name or account ID
 
