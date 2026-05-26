@@ -595,7 +595,7 @@ func handleEks() {
 		}
 
 	case "create-profiles":
-		handleCreateProfiles("")
+		handleCreateProfiles()
 
 	default:
 		fmt.Fprintf(os.Stderr, "%s Unknown subcommand: ksw eks %s\n", warnStyle.Render("✗"), args[0])
@@ -607,37 +607,34 @@ func handleEks() {
 var awsUsage = `%s
 
 Usage:
-  ksw aws sso config                               Configure AWS SSO sessions (TUI)
-  ksw aws sso login                                Login to default SSO session
-  ksw aws sso login <session>                      Login to a specific SSO session
-  ksw aws sso profiles list                        List configured AWS profiles
-  ksw aws sso profiles sync                        Auto-sync SSO accounts to ~/.aws/config
-  ksw aws sso profiles sync --session <name>       Sync only one SSO session
-  ksw aws sso profiles add <name> <id>             Add a single profile [--session <s>]
-  ksw aws sso profiles search <term>               Search profiles by name or account ID
+  ksw aws sso config                      Configure AWS SSO sessions (TUI)
+  ksw aws sso login                       Login to default SSO session
+  ksw aws sso login <session>             Login to a specific SSO session
+  ksw aws sso profiles list               List configured AWS profiles
+  ksw aws sso profiles sync               Auto-sync SSO accounts to ~/.aws/config
+  ksw aws sso profiles add <name> <id>    Add a single profile [--session <s>]
+  ksw aws sso profiles search <term>      Search profiles by name or account ID
 `
 
 var ssoUsage = `%s
 
 Usage:
-  ksw aws sso config                               Configure AWS SSO sessions (TUI)
-  ksw aws sso login                                Login to default SSO session
-  ksw aws sso login <session>                      Login to a specific SSO session
-  ksw aws sso profiles list                        List configured AWS profiles
-  ksw aws sso profiles sync                        Auto-sync SSO accounts to ~/.aws/config
-  ksw aws sso profiles sync --session <name>       Sync only one SSO session
-  ksw aws sso profiles add <name> <id>             Add a single profile [--session <s>]
-  ksw aws sso profiles search <term>               Search profiles by name or account ID
+  ksw aws sso config                      Configure AWS SSO sessions (TUI)
+  ksw aws sso login                       Login to default SSO session
+  ksw aws sso login <session>             Login to a specific SSO session
+  ksw aws sso profiles list               List configured AWS profiles
+  ksw aws sso profiles sync               Auto-sync SSO accounts to ~/.aws/config
+  ksw aws sso profiles add <name> <id>    Add a single profile [--session <s>]
+  ksw aws sso profiles search <term>      Search profiles by name or account ID
 `
 
 var ssoProfilesUsage = `%s
 
 Usage:
-  ksw aws sso profiles list                        List configured AWS profiles
-  ksw aws sso profiles sync                        Auto-sync SSO accounts to ~/.aws/config
-  ksw aws sso profiles sync --session <name>       Sync only one SSO session
-  ksw aws sso profiles add <name> <id>             Add a single profile [--session <s>]
-  ksw aws sso profiles search <term>               Search profiles by name or account ID
+  ksw aws sso profiles list               List configured AWS profiles
+  ksw aws sso profiles sync               Auto-sync SSO accounts to ~/.aws/config
+  ksw aws sso profiles add <name> <id>    Add a single profile [--session <s>]
+  ksw aws sso profiles search <term>      Search profiles by name or account ID
 `
 
 func handleAWS() {
@@ -688,14 +685,7 @@ func handleAWSSSO_Profiles(args []string) {
 	case "list", "ls":
 		handleListProfiles()
 	case "sync":
-		session := ""
-		for i := 1; i < len(args); i++ {
-			if args[i] == "--session" && i+1 < len(args) {
-				session = args[i+1]
-				break
-			}
-		}
-		handleCreateProfiles(session)
+		handleCreateProfiles()
 	case "add":
 		if len(args) < 3 {
 			fmt.Fprintf(os.Stderr, "%s Usage: ksw aws sso profiles add <name> <account-id> [--session <s>]\n", warnStyle.Render("✗"))
