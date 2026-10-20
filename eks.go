@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,9 +25,10 @@ type awsProfile struct {
 
 // eksCluster representa un clúster descubierto pendiente de procesar
 type eksCluster struct {
-	Name    string // nombre del clúster EKS
-	Profile string // perfil AWS usado para descubrirlo
-	Region  string // región donde se encontró
+	Name      string // nombre del clúster EKS
+	Profile   string // perfil AWS usado para descubrirlo
+	Region    string // región donde se encontró
+	AccountID string // account ID del perfil ("" si el perfil no es SSO)
 }
 
 // syncResult acumula los contadores del resumen final
@@ -192,21 +194,78 @@ func parseListClustersJSON(data []byte) ([]string, error) {
 // y retorna la lista de nombres de clústeres descubiertos.
 // Maneja errores de credenciales y red sin interrumpir la ejecución.
 func listEKSClusters(profile, region string) ([]string, error) {
-	cmd := exec.Command("aws", "eks", "list-clusters",
-		"--profile", profile,
-		"--region", region,
-		"--output", "json",
-	)
-	out, err := cmd.Output()
-	if err != nil {
+	var lastErr error
+	for attempt := 0; attempt < awsMaxAttempts; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * 700 * time.Millisecond)
+		}
+		cmd := exec.Command("aws", "eks", "list-clusters",
+			"--profile", profile,
+			"--region", region,
+			"--output", "json",
+		)
+		out, err := cmd.Output()
+		if err == nil {
+			return parseListClustersJSON(out)
+		}
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
-			stderr := strings.TrimSpace(string(exitErr.Stderr))
-			return nil, fmt.Errorf("%s", stderr)
+			lastErr = fmt.Errorf("%s", strings.TrimSpace(string(exitErr.Stderr)))
+		} else {
+			lastErr = fmt.Errorf("aws eks list-clusters failed: %w", err)
 		}
-		return nil, fmt.Errorf("aws eks list-clusters failed: %w", err)
+		if !isTransientAWSError(lastErr.Error()) {
+			break
+		}
 	}
-	return parseListClustersJSON(out)
+	return nil, lastErr
+}
+
+// awsMaxAttempts es el número de intentos para llamadas AWS con fallos transitorios.
+const awsMaxAttempts = 3
+
+// isTransientAWSError indica si el error de la AWS CLI suele ser pasajero
+// (carrera al refrescar el token SSO con muchos procesos en paralelo, red, throttling)
+// y por lo tanto vale la pena reintentar. Errores de permisos o sesión expirada no se reintentan.
+func isTransientAWSError(msg string) bool {
+	m := strings.ToLower(msg)
+	for _, t := range []string{
+		"error loading sso token", "error when retrieving token from sso",
+		"expecting value", "unterminated string", "unexpected end",
+		"timed out", "timeout", "could not connect", "connection reset",
+		"connection was closed", "temporary failure", "eof occurred",
+		"throttl", "toomanyrequests", "requestlimitexceeded", "max retries",
+		"internalfailure", "serviceunavailable", "502", "503",
+	} {
+		if strings.Contains(m, t) {
+			return true
+		}
+	}
+	return false
+}
+
+// warmUpSSOTokens refresca una sola vez (en serie) el token de cada sesión SSO antes de
+// lanzar decenas de procesos `aws` en paralelo. Si el access token está vencido pero el
+// refresh token es válido, N procesos intentando refrescarlo a la vez se pisan el archivo
+// de caché y algunos fallan de forma intermitente.
+func warmUpSSOTokens(profiles []awsProfile) {
+	details := readProfileDetails()
+	seen := make(map[string]bool)
+	for _, p := range profiles {
+		d, ok := details[p.Name]
+		if !ok || d.Session == "" || seen[d.Session] {
+			continue
+		}
+		seen[d.Session] = true
+		refreshSSOToken(p.Name)
+	}
+}
+
+// refreshSSOToken ejecuta una llamada barata con el profile para que la AWS CLI renueve el token en caché.
+func refreshSSOToken(profile string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	_ = exec.CommandContext(ctx, "aws", "sts", "get-caller-identity", "--profile", profile, "--output", "json").Run()
 }
 
 // ── Detección de duplicados ─────────────────────────────
@@ -252,11 +311,21 @@ func updateKubeconfig(cluster, profile, region, tmpFile string) error {
 	if tmpFile != "" {
 		args = append(args, "--kubeconfig", tmpFile)
 	}
-	cmd := exec.Command("aws", args...)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to update kubeconfig for cluster '%s': %s", cluster, strings.TrimSpace(string(out)))
+	var lastOut string
+	for attempt := 0; attempt < awsMaxAttempts; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * 700 * time.Millisecond)
+		}
+		out, err := exec.Command("aws", args...).CombinedOutput()
+		if err == nil {
+			return nil
+		}
+		lastOut = strings.TrimSpace(string(out))
+		if !isTransientAWSError(lastOut) {
+			break
+		}
 	}
-	return nil
+	return fmt.Errorf("failed to update kubeconfig for cluster '%s': %s", cluster, lastOut)
 }
 // mergeKubeconfigs mergea archivos kubeconfig temporales al kubeconfig principal.
 // Usa KUBECONFIG=main:tmp1:tmp2:... kubectl config view --flatten > main
@@ -287,17 +356,31 @@ func mergeKubeconfigs(mainKubeconfig string, tmpFiles []string) error {
 	return os.WriteFile(mainKubeconfig, out, 0600)
 }
 // partitionClusters divide los clústeres descubiertos en nuevos y existentes.
-// Un clúster es "existente" si algún contexto en el mapa existing contiene
-// tanto el nombre del clúster como la región (e.g., el ARN del contexto).
+// Un clúster es "existente" solo si el kubeconfig ya tiene un contexto con el MISMO
+// ARN (región + cuenta + nombre exactos). Antes se usaba coincidencia por subcadena, lo que
+// descartaba clusters nuevos cuando su nombre estaba contenido en otro (p.ej. "eks-app" dentro de
+// "eks-app-qa") o cuando otra cuenta tenía un cluster con el mismo nombre en la misma región.
+// Si el perfil no es SSO (AccountID vacío) se compara solo región + nombre.
 // Retorna dos slices disjuntos cuya unión es igual al conjunto original.
 func partitionClusters(discovered []eksCluster, existing map[string]bool) (newClusters, existingClusters []eksCluster) {
+	exact := make(map[string]bool)
+	loose := make(map[string]bool)
+	for ctx := range existing {
+		// arn:aws:eks:<region>:<account>:cluster/<name>
+		parts := strings.SplitN(ctx, ":", 6)
+		if len(parts) < 6 || !strings.HasPrefix(parts[5], "cluster/") {
+			continue
+		}
+		name := strings.TrimPrefix(parts[5], "cluster/")
+		exact[parts[3]+"|"+parts[4]+"|"+name] = true
+		loose[parts[3]+"|"+name] = true
+	}
 	for _, c := range discovered {
-		found := false
-		for ctx := range existing {
-			if strings.Contains(ctx, c.Region) && strings.Contains(ctx, c.Name) {
-				found = true
-				break
-			}
+		var found bool
+		if c.AccountID != "" {
+			found = exact[c.Region+"|"+c.AccountID+"|"+c.Name]
+		} else {
+			found = loose[c.Region+"|"+c.Name]
 		}
 		if found {
 			existingClusters = append(existingClusters, c)
@@ -307,8 +390,6 @@ func partitionClusters(discovered []eksCluster, existing map[string]bool) (newCl
 	}
 	return newClusters, existingClusters
 }
-
-
 
 // ── Orquestadores ───────────────────────────────────────
 
@@ -358,8 +439,11 @@ func handleEksKubeconfig(profileFilter string) {
 		}
 	}
 
-	// 4. Descubrir clústeres EKS por perfil (en paralelo, máx 32 concurrentes)
-	const maxConcurrent = 32
+	// 4. Descubrir clústeres EKS por perfil (en paralelo, máx 16 concurrentes)
+	fmt.Printf("  %s Refreshing SSO tokens...\n", dimStyle.Render("⟳"))
+	warmUpSSOTokens(profiles)
+	profileDetails := readProfileDetails()
+	const maxConcurrent = 16
 	sem := make(chan struct{}, maxConcurrent)
 
 	type profileResult struct {
@@ -422,7 +506,8 @@ func handleEksKubeconfig(profileFilter string) {
 				successStyle.Render("✔"), r.profile.Name, r.profile.Region,
 				cyanStyle.Render(fmt.Sprintf("%d cluster(s) found", len(r.clusters))))
 			for _, c := range r.clusters {
-				allDiscovered = append(allDiscovered, eksCluster{Name: c, Profile: r.profile.Name, Region: r.profile.Region})
+				allDiscovered = append(allDiscovered, eksCluster{Name: c, Profile: r.profile.Name, Region: r.profile.Region,
+					AccountID: profileDetails[r.profile.Name].AccountID})
 			}
 		}
 	}
@@ -479,6 +564,13 @@ func handleEksKubeconfig(profileFilter string) {
 
 	var result syncResult
 	var tmpFiles []string
+	var addedClusters []eksAddedCluster
+	knownAccounts := make(map[string]bool)
+	for ctx := range existing {
+		if id := accountIDFromContext(ctx); id != "" {
+			knownAccounts[id] = true
+		}
+	}
 
 	addedCount := 0
 	totalNew := len(newClusters)
@@ -518,6 +610,13 @@ func handleEksKubeconfig(profileFilter string) {
 			addedCount++
 			result.Added++
 			tmpFiles = append(tmpFiles, s.tmpFile)
+			addedClusters = append(addedClusters, eksAddedCluster{
+				Cluster:    s.cluster.Name,
+				Profile:    s.cluster.Profile,
+				Region:     s.cluster.Region,
+				AccountID:  s.cluster.AccountID,
+				NewAccount: s.cluster.AccountID != "" && !knownAccounts[s.cluster.AccountID],
+			})
 			fmt.Printf("\r\033[K  %s added %s  (%s)\n",
 				cyanStyle.Render("✔"), s.cluster.Name, s.cluster.Profile)
 		}
@@ -539,13 +638,27 @@ func handleEksKubeconfig(profileFilter string) {
 		result.Skipped++
 	}
 
-	// Resumen final
+	// Resumen final + detalle por cuenta de los clusters agregados
 	fmt.Println()
-	fmt.Printf("  %s Done — %s added, %s skipped, %s failed\n",
-		successStyle.Render("✔"),
-		successStyle.Render(fmt.Sprintf("%d", result.Added)),
-		dimStyle.Render(fmt.Sprintf("%d", result.Skipped)),
-		warnStyle.Render(fmt.Sprintf("%d", result.Failed)))
+	printReport(kubeSyncReport(&eksSyncResultData{
+		added: result.Added, skipped: result.Skipped, failed: result.Failed,
+		addedClusters: addedClusters,
+	}, "", 100))
+
+	// Cuentas que dejaron de existir en SSO (solo en el sync completo, no con --profile)
+	if profileFilter == "" {
+		stale, note := detectStaleAccounts()
+		if len(stale) > 0 {
+			fmt.Println()
+			printReport(staleSection(stale, "", 100))
+			promptStaleRemoval(stale)
+			if !stdinIsTerminal() {
+				fmt.Printf("\n  %s Run this command in a terminal to remove them interactively.\n", dimStyle.Render("·"))
+			}
+		} else if note != "" {
+			fmt.Printf("\n  %s %s\n", dimStyle.Render("·"), dimStyle.Render(note))
+		}
+	}
 }
 
 // handleEks es el entry point desde main(), enruta subcomandos de "ksw eks".

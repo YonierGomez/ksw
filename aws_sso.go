@@ -191,57 +191,9 @@ func isValidAccountID(id string) bool {
 // ── Obtener cuentas desde AWS SSO ──────────────────────
 
 func loadSSOAccounts() ([]ssoAccount, error) {
-	ssoCfg := loadSSOSettings()
-	cmd := exec.Command("aws", "sso", "list-accounts", "--region", ssoCfg.Region)
-	cmd.Env = append(os.Environ(), "AWS_PAGER=")
-	out, err := cmd.Output()
-	if err == nil {
-		var resp ssoListResponse
-		if err := json.Unmarshal(out, &resp); err == nil && len(resp.AccountList) > 0 {
-			return resp.AccountList, nil
-		}
-	}
-
-	// Fallback: token desde cache
-	home, _ := os.UserHomeDir()
-	cacheDir := filepath.Join(home, ".aws", "sso", "cache")
-	entries, err := os.ReadDir(cacheDir)
-	if err != nil {
-		return nil, fmt.Errorf("SSO cache not found. Run: aws sso login --sso-session %s", ssoCfg.SessionName)
-	}
-
-	var token string
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".json") {
-			continue
-		}
-		data, _ := os.ReadFile(filepath.Join(cacheDir, e.Name()))
-		var cache map[string]interface{}
-		if json.Unmarshal(data, &cache) != nil {
-			continue
-		}
-		if t, ok := cache["accessToken"].(string); ok && t != "" {
-			token = t
-			break
-		}
-	}
-	if token == "" {
-		return nil, fmt.Errorf("no valid SSO token. Run: aws sso login --sso-session %s", ssoCfg.SessionName)
-	}
-
-	cmd = exec.Command("aws", "sso", "list-accounts", "--access-token", token, "--region", ssoCfg.Region)
-	cmd.Env = append(os.Environ(), "AWS_PAGER=")
-	out, err = cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list SSO accounts. Run: aws sso login --sso-session %s", ssoCfg.SessionName)
-	}
-	var resp ssoListResponse
-	if err := json.Unmarshal(out, &resp); err != nil {
-		return nil, fmt.Errorf("failed to parse SSO response: %w", err)
-	}
-	return resp.AccountList, nil
+	accounts, _, err := listSSOAccountsForSession("")
+	return accounts, err
 }
-
 
 // ── Normalización de nombres ───────────────────────────
 
@@ -591,10 +543,10 @@ func updateAccountIDInConfig(profileName, oldID, newID string) error {
 }
 
 
-// ── Comando: ksw eks create-profiles (auto sync) ──────
+// ── Comando: ksw aws sso profiles sync (auto sync) ─────
 
 func handleCreateProfiles() {
-	fmt.Println(logoStyle.Render("⎈ ksw eks create-profiles"))
+	fmt.Println(logoStyle.Render("⎈ ksw aws sso profiles sync"))
 	fmt.Println()
 
 	if err := checkAWSCLI(); err != nil {
@@ -607,204 +559,31 @@ func handleCreateProfiles() {
 		os.Exit(1)
 	}
 
-	// Obtener cuentas SSO
-	fmt.Printf("  %s Fetching SSO accounts...\n", dimStyle.Render("⟳"))
-	ssoAccounts, err := loadSSOAccounts()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s %s\n", warnStyle.Render("✗"), err)
-		os.Exit(1)
-	}
-	fmt.Printf("  %s %d accounts from SSO\n", successStyle.Render("✔"), len(ssoAccounts))
+	session := loadSSOSettings().SessionName
+	fmt.Printf("  %s Fetching SSO accounts for session '%s'...\n", dimStyle.Render("⟳"), session)
 
-	// Parsear perfiles actuales
-	profiles, malformed, err := parseProfilesWithAccountID()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s %s\n", warnStyle.Render("✗"), err)
+	// Mismo motor que el TUI: 1 lectura, 1 escritura de ~/.aws/config (con backup si hay cambios)
+	progressCh := make(chan syncProfileLine, 512)
+	go func() {
+		for range progressCh {
+		}
+	}()
+	res := runSyncProfilesStreaming(session, progressCh)
+	close(progressCh)
+
+	if res.err != nil {
+		fmt.Fprintf(os.Stderr, "%s %s\n", warnStyle.Render("✗"), res.err)
 		os.Exit(1)
 	}
-	fmt.Printf("  %s %d profiles configured", successStyle.Render("✔"), len(profiles))
-	if len(malformed) > 0 {
-		fmt.Printf(" (%s malformed)", warnStyle.Render(fmt.Sprintf("%d", len(malformed))))
-	}
+
 	fmt.Println()
+	printReport(syncProfilesReport(&res, "", 100))
 
-	// Construir mapas de SSO
-	ssoByNorm := make(map[string]ssoAccount) // normalized name -> account
-	ssoByID := make(map[string]string)        // accountID -> normalized name
-	for _, a := range ssoAccounts {
-		norm := normalizeAccountName(a.AccountName)
-		ssoByNorm[norm] = a
-		ssoByID[a.AccountID] = norm
+	// Cuentas que ya no existen: ofrecer eliminar profiles y clusters
+	promptStaleRemoval(res.stale)
+	if len(res.stale) > 0 && !stdinIsTerminal() {
+		fmt.Printf("\n  %s Run this command in a terminal to remove them interactively.\n", dimStyle.Render("·"))
 	}
-
-	needsBackup := false
-	var renames [][2]string // old, new
-	var idFixes [][3]string // profile, oldID, newID
-
-	// Detectar perfiles con nombres incorrectos
-	for name, id := range profiles {
-		if expected, ok := ssoByID[id]; ok && expected != name {
-			renames = append(renames, [2]string{name, expected})
-			needsBackup = true
-		}
-	}
-
-	// Detectar perfiles con account ID incorrecto
-	for name, id := range profiles {
-		if expected, ok := ssoByNorm[name]; ok && expected.AccountID != id {
-			idFixes = append(idFixes, [3]string{name, id, expected.AccountID})
-			needsBackup = true
-		}
-	}
-
-	// Detectar cuentas faltantes
-	existingIDs := make(map[string]bool)
-	existingNames := make(map[string]bool)
-	for name, id := range profiles {
-		existingIDs[id] = true
-		existingNames[name] = true
-	}
-	var missing []ssoAccount
-	for _, a := range ssoAccounts {
-		if !existingIDs[a.AccountID] {
-			missing = append(missing, a)
-			needsBackup = true
-		}
-	}
-
-	// Si no hay cambios
-	if !needsBackup {
-		fmt.Println()
-		fmt.Printf("%s All %d SSO accounts are already configured\n",
-			successStyle.Render("✔"), len(ssoAccounts))
-		return
-	}
-
-	// Crear backup
-	backup, err := createAWSConfigBackup()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s Backup failed: %s\n", warnStyle.Render("✗"), err)
-		os.Exit(1)
-	}
-	if backup != "" {
-		fmt.Printf("  %s Backup: %s\n", dimStyle.Render("·"), backup)
-	}
-	fmt.Println()
-
-	// Aplicar renombramientos
-	if len(renames) > 0 {
-		fmt.Printf("  %s Fixing %d profile names:\n", dimStyle.Render("⟳"), len(renames))
-		for _, r := range renames {
-			if err := renameProfileInConfig(r[0], r[1]); err != nil {
-				fmt.Printf("    %s %s → %s: %s\n", warnStyle.Render("✗"), r[0], r[1], err)
-			} else {
-				fmt.Printf("    %s %s → %s\n", successStyle.Render("✔"), r[0], r[1])
-			}
-		}
-		// Recargar perfiles
-		profiles, malformed, _ = parseProfilesWithAccountID()
-		existingIDs = make(map[string]bool)
-		existingNames = make(map[string]bool)
-		for name, id := range profiles {
-			existingIDs[id] = true
-			existingNames[name] = true
-		}
-		fmt.Println()
-	}
-
-	// Aplicar correcciones de account ID
-	if len(idFixes) > 0 {
-		fmt.Printf("  %s Fixing %d account IDs:\n", dimStyle.Render("⟳"), len(idFixes))
-		for _, fix := range idFixes {
-			if err := updateAccountIDInConfig(fix[0], fix[1], fix[2]); err != nil {
-				fmt.Printf("    %s %s: %s\n", warnStyle.Render("✗"), fix[0], err)
-			} else {
-				fmt.Printf("    %s %s: %s → %s\n", successStyle.Render("✔"), fix[0], fix[1], fix[2])
-			}
-		}
-		// Recargar
-		profiles, _, _ = parseProfilesWithAccountID()
-		existingIDs = make(map[string]bool)
-		existingNames = make(map[string]bool)
-		for name, id := range profiles {
-			existingIDs[id] = true
-			existingNames[name] = true
-		}
-		// Recalcular missing
-		missing = nil
-		for _, a := range ssoAccounts {
-			if !existingIDs[a.AccountID] {
-				missing = append(missing, a)
-			}
-		}
-		fmt.Println()
-	}
-
-	// Corregir malformed account IDs
-	if len(malformed) > 0 {
-		fmt.Printf("  %s Fixing %d malformed account IDs:\n", dimStyle.Render("⟳"), len(malformed))
-		for name, badID := range malformed {
-			if expected, ok := ssoByNorm[name]; ok {
-				if err := updateAccountIDInConfig(name, badID, expected.AccountID); err != nil {
-					fmt.Printf("    %s %s: %s\n", warnStyle.Render("✗"), name, err)
-				} else {
-					fmt.Printf("    %s %s: %s → %s\n", successStyle.Render("✔"), name, badID, expected.AccountID)
-				}
-			} else {
-				fmt.Printf("    %s %s: no SSO match for malformed ID %s\n", warnStyle.Render("✗"), name, badID)
-			}
-		}
-		// Recargar y recalcular
-		profiles, _, _ = parseProfilesWithAccountID()
-		existingIDs = make(map[string]bool)
-		for _, id := range profiles {
-			existingIDs[id] = true
-		}
-		existingNames = make(map[string]bool)
-		for name := range profiles {
-			existingNames[name] = true
-		}
-		missing = nil
-		for _, a := range ssoAccounts {
-			if !existingIDs[a.AccountID] {
-				missing = append(missing, a)
-			}
-		}
-		fmt.Println()
-	}
-
-	// Agregar cuentas faltantes
-	added := 0
-	skipped := 0
-	if len(missing) > 0 {
-		fmt.Printf("  %s Adding %d missing profiles:\n", dimStyle.Render("⟳"), len(missing))
-		for _, a := range missing {
-			name := normalizeAccountName(a.AccountName)
-			if existingNames[name] || existingIDs[a.AccountID] {
-				fmt.Printf("    %s %s (%s) — skipped (conflict)\n", dimStyle.Render("·"), name, a.AccountID)
-				skipped++
-				continue
-			}
-			if err := addProfileToConfig(name, a.AccountID); err != nil {
-				fmt.Printf("    %s %s: %s\n", warnStyle.Render("✗"), name, err)
-				skipped++
-			} else {
-				fmt.Printf("    %s %s (%s)\n", successStyle.Render("✔"), name, a.AccountID)
-				existingNames[name] = true
-				existingIDs[a.AccountID] = true
-				added++
-			}
-		}
-		fmt.Println()
-	}
-
-	// Resumen
-	finalProfiles, _, _ := parseProfilesWithAccountID()
-	fmt.Printf("Done: %s added, %s fixed, %s skipped, %s total profiles\n",
-		successStyle.Render(fmt.Sprintf("%d", added)),
-		successStyle.Render(fmt.Sprintf("%d", len(renames)+len(idFixes))),
-		dimStyle.Render(fmt.Sprintf("%d", skipped)),
-		successStyle.Render(fmt.Sprintf("%d", len(finalProfiles))))
 }
 
 
@@ -813,6 +592,9 @@ func handleCreateProfiles() {
 type syncProfileLine struct {
 	ok   bool
 	text string
+
+	// Si text == "" la línea solo cambia la fase actual que muestra el spinner
+	phase string
 }
 
 type syncProfilesResult struct {
@@ -821,6 +603,29 @@ type syncProfilesResult struct {
 	fixed int
 	total int
 	err   error
+
+	// Detalle estructurado para los reportes (CLI y TUI)
+	session       string           // sesión SSO sincronizada
+	ssoTotal      int              // cuentas devueltas por AWS SSO
+	addedProfiles []syncedProfile  // profiles creados en esta ejecución
+	changes       []syncedChange   // renombres / correcciones de account ID
+	skipped       []syncProfileLine // cuentas omitidas (conflictos, IDs inválidos)
+	stale         []staleAccount   // cuentas con profile que ya no existen en SSO
+	backup        string           // backup de ~/.aws/config (si hubo cambios)
+}
+
+// syncedProfile es un profile creado a partir de una cuenta SSO.
+type syncedProfile struct {
+	Name        string
+	AccountID   string
+	AccountName string // nombre original de la cuenta en SSO
+}
+
+// syncedChange describe una corrección sobre un profile existente.
+type syncedChange struct {
+	Profile string
+	Kind    string // "renamed" | "account id" | "malformed id"
+	Detail  string
 }
 
 // syncProfilesMsgResult es el tea.Msg que regresa el resultado del sync
@@ -859,9 +664,13 @@ func runSyncProfilesStreaming(sessionName string, progressCh chan<- syncProfileL
 	var res syncProfilesResult
 
 	send := func(ok bool, msg string) {
-		line := syncProfileLine{ok, msg}
+		line := syncProfileLine{ok: ok, text: msg}
 		res.lines = append(res.lines, line)
 		progressCh <- line
+	}
+	// sendPhase solo cambia el texto del spinner; no aparece en la lista ni en el resultado final
+	sendPhase := func(phase string) {
+		progressCh <- syncProfileLine{phase: phase}
 	}
 
 	// Obtener la sesión SSO correcta
@@ -873,12 +682,21 @@ func runSyncProfilesStreaming(sessionName string, progressCh chan<- syncProfileL
 		ssoCfg = loadSSOSettings()
 	}
 
-	// Única llamada de red
-	accounts, err := loadSSOAccounts()
+	if sessionName == "" {
+		sessionName = ssoCfg.SessionName
+	}
+	res.session = sessionName
+
+	// Única llamada de red (usa el token de la sesión indicada)
+	sendPhase("Contacting AWS SSO...")
+	accounts, tokenMatched, err := listSSOAccountsForSession(sessionName)
 	if err != nil {
 		res.err = err
 		return res
 	}
+	res.ssoTotal = len(accounts)
+	send(true, fmt.Sprintf("%d SSO accounts found in session '%s'", len(accounts), sessionName))
+	sendPhase("Comparing with ~/.aws/config...")
 
 	// ── Leer ~/.aws/config UNA SOLA VEZ ──────────────────
 	configFile := awsConfigPath()
@@ -912,9 +730,21 @@ func runSyncProfilesStreaming(sessionName string, progressCh chan<- syncProfileL
 	accountIDRe := regexp.MustCompile(`(sso_account_id\s*=\s*)\S+`)
 
 	// ── Fase 1: renombrar profiles con nombre incorrecto ─
-	for name, id := range profiles {
+	// Orden determinista (el orden de un map en Go es aleatorio y daba resultados distintos entre ejecuciones)
+	phase1Names := make([]string, 0, len(profiles))
+	for name := range profiles {
+		phase1Names = append(phase1Names, name)
+	}
+	sort.Strings(phase1Names)
+	for _, name := range phase1Names {
+		id := profiles[name]
 		expected, ok := ssoByID[id]
 		if !ok || expected == name {
+			continue
+		}
+		// Si ya existe un profile con el nombre destino (p.ej. dos profiles para la misma cuenta)
+		// renombrar duplicaría la sección [profile X] en ~/.aws/config.
+		if existingNames[expected] {
 			continue
 		}
 		old := "[profile " + name + "]"
@@ -923,6 +753,7 @@ func runSyncProfilesStreaming(sessionName string, progressCh chan<- syncProfileL
 		}
 		content = strings.Replace(content, old, "[profile "+expected+"]", 1)
 		send(true, fmt.Sprintf("renamed %s → %s", name, expected))
+		res.changes = append(res.changes, syncedChange{Profile: expected, Kind: "renamed", Detail: "from " + name})
 		res.fixed++
 		delete(existingNames, name)
 		existingNames[expected] = true
@@ -964,6 +795,7 @@ func runSyncProfilesStreaming(sessionName string, progressCh chan<- syncProfileL
 		}
 		content = content[:idx] + newBlock + content[blockEnd:]
 		send(true, fmt.Sprintf("fixed id %s (%s → %s)", name, id, expected.AccountID))
+		res.changes = append(res.changes, syncedChange{Profile: name, Kind: "account id", Detail: id + " → " + expected.AccountID})
 		res.fixed++
 		existingIDs[expected.AccountID] = true
 		delete(existingIDs, id)
@@ -995,6 +827,7 @@ func runSyncProfilesStreaming(sessionName string, progressCh chan<- syncProfileL
 		}
 		content = content[:idx] + newBlock + content[blockEnd:]
 		send(true, fmt.Sprintf("fixed malformed %s (%s → %s)", name, badID, expected.AccountID))
+		res.changes = append(res.changes, syncedChange{Profile: name, Kind: "malformed id", Detail: badID + " → " + expected.AccountID})
 		res.fixed++
 		existingIDs[expected.AccountID] = true
 	}
@@ -1016,26 +849,45 @@ func runSyncProfilesStreaming(sessionName string, progressCh chan<- syncProfileL
 		}
 		name := normalizeAccountName(a.AccountName)
 		if existingNames[name] {
-			send(false, fmt.Sprintf("skip %s — name conflict", name))
+			send(false, fmt.Sprintf("skip %s (%s) — name conflict", name, a.AccountID))
+			res.skipped = append(res.skipped, syncProfileLine{ok: false, text: fmt.Sprintf("%s (%s) — name conflict with an existing profile", name, a.AccountID)})
 			continue
 		}
 		if !isValidAccountID(a.AccountID) {
 			send(false, fmt.Sprintf("skip %s — invalid account ID: %s", name, a.AccountID))
+			res.skipped = append(res.skipped, syncProfileLine{ok: false, text: fmt.Sprintf("%s — invalid account ID: %s", name, a.AccountID)})
 			continue
 		}
 		newBlocks.WriteString(fmt.Sprintf("\n[profile %s]\nsso_session = %s\nsso_account_id = %s\nsso_role_name = %s\nregion = %s\noutput = json\n",
 			name, ssoCfg.SessionName, a.AccountID, ssoCfg.RoleName, ssoCfg.Region))
 		send(true, fmt.Sprintf("added %s (%s)", name, a.AccountID))
+		res.addedProfiles = append(res.addedProfiles, syncedProfile{Name: name, AccountID: a.AccountID, AccountName: a.AccountName})
 		res.added++
 		existingIDs[a.AccountID] = true
 		existingNames[name] = true
 	}
 	content += newBlocks.String()
 
-	// ── Escribir ~/.aws/config UNA SOLA VEZ ──────────────
-	if err := os.WriteFile(configFile, []byte(content), 0644); err != nil {
-		res.err = fmt.Errorf("failed to write %s: %w", configFile, err)
-		return res
+	// ── Escribir ~/.aws/config UNA SOLA VEZ (solo si hubo cambios) ──
+	if content != string(rawData) {
+		sendPhase("Writing ~/.aws/config (backup first)...")
+		if backup, err := createAWSConfigBackup(); err == nil {
+			res.backup = backup
+		}
+		if err := os.WriteFile(configFile, []byte(content), 0644); err != nil {
+			res.err = fmt.Errorf("failed to write %s: %w", configFile, err)
+			return res
+		}
+	}
+
+	// ── Cuentas que ya no existen en SSO (solo con token de esta sesión) ──
+	if tokenMatched {
+		sendPhase("Checking for accounts no longer in SSO...")
+		contexts, cerr := getExistingEKSContexts()
+		if cerr != nil {
+			contexts = map[string]bool{}
+		}
+		res.stale = findStaleAccounts(parseProfileDetails(content), sessionName, accounts, contexts)
 	}
 
 	// Contar total final sin leer el archivo (ya lo tenemos en memoria)
@@ -1508,6 +1360,9 @@ const (
 	ssoStepSyncingKube                     // spinner mientras se hace sync de kubeconfig
 	ssoStepSyncKubeResult                  // resultado del sync de kubeconfig
 	ssoStepConfirmDelete                   // confirmar eliminación de la única sesión
+	ssoStepStaleSelect                     // elegir cuentas que ya no existen en SSO
+	ssoStepStaleConfirm                    // confirmar eliminación de profiles/clusters
+	ssoStepStaleDone                       // resultado de la eliminación
 	ssoStepDone                            // confirmation (sale del TUI — solo para quit explícito)
 )
 
@@ -1558,12 +1413,18 @@ type ssoConfigModel struct {
 	syncProgressLines    []syncProfileLine           // líneas en vivo durante sync profiles
 	syncProfilesCh       <-chan syncProfileLine       // canal de progreso activo
 	syncProfilesResultCh <-chan syncProfilesResult    // canal de resultado final
-	syncTotal            int                         // total de profiles en el sync activo
+	syncPhase            string                      // fase actual del sync de profiles (texto del spinner)
+	kubeDone             int                         // pasos completados del sync kubeconfig
 	kubeProgressLines    []eksSyncLine               // líneas en vivo durante sync kubeconfig
 	kubeProgressCh       <-chan eksSyncLine           // canal de progreso kubeconfig
 	kubeResultCh         <-chan eksSyncResultData     // canal de resultado kubeconfig
 	kubeTotal            int                         // total de profiles en el sync kube
 	filterInput          string                       // búsqueda en ssoStepSyncPick
+	scroll               int                          // desplazamiento en pantallas de resultado
+	staleAccounts        []staleAccount               // cuentas que ya no existen en SSO
+	staleSel             []bool                       // selección en ssoStepStaleSelect
+	staleRemoved         staleRemoval                 // resultado de la última eliminación
+	staleWithClusters    bool                         // si la última eliminación incluyó clusters
 	spinnerFrame         int
 	width             int
 	height            int
@@ -1617,11 +1478,10 @@ func cmdRunSync(sessionName string) tea.Cmd {
 // withSync arranca el sync y retorna el modelo actualizado + el cmd.
 func withSync(m ssoConfigModel, sessionName string) (ssoConfigModel, tea.Cmd) {
 	pCh, rCh, drainCmd := startSyncProfiles(sessionName)
-	profiles, _ := parseAWSProfiles("")
 	m.syncProfilesCh = pCh
 	m.syncProfilesResultCh = rCh
 	m.syncProgressLines = nil
-	m.syncTotal = len(profiles)
+	m.syncPhase = ""
 	m.step = ssoStepSyncing
 	m.spinnerFrame = 0
 	return m, tea.Batch(spinnerTick(), drainCmd)
@@ -1656,6 +1516,8 @@ func startSyncKube() (<-chan eksSyncLine, <-chan eksSyncResultData, int, tea.Cmd
 	go func() {
 		result := runEKSSyncTUIStreaming(profiles, progressCh)
 		close(progressCh)
+		// Con el sync completo, verificar si alguna cuenta dejó de existir en SSO
+		result.stale, result.staleNote = detectStaleAccounts()
 		resultCh <- result
 	}()
 	return progressCh, resultCh, len(profiles), drainSyncKubeCh(progressCh, resultCh)
@@ -1666,6 +1528,7 @@ func withSyncKube(m ssoConfigModel) (ssoConfigModel, tea.Cmd) {
 	m.kubeProgressCh = pCh
 	m.kubeResultCh = rCh
 	m.kubeProgressLines = nil
+	m.kubeDone = 0
 	m.kubeTotal = total
 	m.step = ssoStepSyncingKube
 	m.spinnerFrame = 0
@@ -1677,7 +1540,8 @@ func (m ssoConfigModel) Init() tea.Cmd {
 }
 
 func (m ssoConfigModel) isMenuStep() bool {
-	return m.step == ssoStepMenu || m.step == ssoStepPick || m.step == ssoStepLoginPick || m.step == ssoStepSyncPick
+	return m.step == ssoStepMenu || m.step == ssoStepPick || m.step == ssoStepLoginPick || m.step == ssoStepSyncPick ||
+		m.step == ssoStepStaleSelect
 }
 
 func (m ssoConfigModel) isStatusStep() bool {
@@ -1716,8 +1580,105 @@ func (m ssoConfigModel) menuLen() int {
 		return len(m.awsConfigSessions)
 	case ssoStepSyncPick:
 		return len(m.filteredSessions())
+	case ssoStepStaleSelect:
+		return len(m.staleAccounts)
 	}
 	return 0
+}
+
+// ── Pantallas de resultado con scroll ──────────────────
+
+func (m ssoConfigModel) reportWidth() int {
+	w := m.width - 8
+	if w < 50 {
+		w = 50
+	}
+	return w
+}
+
+// resultBody construye el reporte completo (sin indentación) de la pantalla de resultado actual.
+func (m ssoConfigModel) resultBody() []string {
+	switch m.step {
+	case ssoStepSyncResult:
+		if m.syncResult == nil || m.syncResult.err != nil {
+			return nil
+		}
+		hint := "" // la tecla [d] se muestra en el pie de la pantalla
+		return syncProfilesReport(m.syncResult, hint, m.reportWidth())
+	case ssoStepSyncKubeResult:
+		if m.kubeResult == nil || m.kubeResult.err != nil {
+			return nil
+		}
+		hint := "" // la tecla [d] se muestra en el pie de la pantalla
+		return kubeSyncReport(m.kubeResult, hint, m.reportWidth())
+	}
+	return nil
+}
+
+// scrollableReport devuelve la porción visible del reporte (indentada) con indicadores de scroll.
+func (m ssoConfigModel) scrollableReport() []string {
+	body := m.resultBody()
+	visible := m.resultVisible()
+	scroll := clampInt(m.scroll, 0, m.maxScroll())
+	end := scroll + visible
+	if end > len(body) {
+		end = len(body)
+	}
+	var out []string
+	if scroll > 0 {
+		out = append(out, "  "+rpDim.Render(fmt.Sprintf("↑ %d more lines above", scroll)))
+	}
+	out = append(out, indentLines(body[scroll:end], "  ")...)
+	if end < len(body) {
+		out = append(out, "  "+rpDim.Render(fmt.Sprintf("↓ %d more lines below", len(body)-end)))
+	}
+	return out
+}
+
+func (m ssoConfigModel) resultVisible() int {
+	v := m.height - 11
+	if v < 6 {
+		v = 6
+	}
+	return v
+}
+
+func (m ssoConfigModel) maxScroll() int {
+	max := len(m.resultBody()) - m.resultVisible()
+	if max < 0 {
+		return 0
+	}
+	return max
+}
+
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+
+// selectedStale retorna las cuentas marcadas en la pantalla de selección.
+func (m ssoConfigModel) selectedStale() []staleAccount {
+	var out []staleAccount
+	for i, a := range m.staleAccounts {
+		if i < len(m.staleSel) && m.staleSel[i] {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// openStaleSelect abre la selección de cuentas obsoletas desde una pantalla de resultado.
+func (m ssoConfigModel) openStaleSelect(stale []staleAccount) ssoConfigModel {
+	m.staleAccounts = stale
+	m.staleSel = make([]bool, len(stale))
+	m.cursor = 0
+	m.step = ssoStepStaleSelect
+	return m
 }
 
 func (m ssoConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -1742,11 +1703,16 @@ func (m ssoConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case syncProfilesProgressMsg:
+		if msg.line.text == "" {
+			m.syncPhase = msg.line.phase
+			return m, drainSyncProfilesCh(m.syncProfilesCh, m.syncProfilesResultCh)
+		}
 		m.syncProgressLines = append(m.syncProgressLines, msg.line)
 		return m, drainSyncProfilesCh(m.syncProfilesCh, m.syncProfilesResultCh)
 
 	case syncProfilesMsgResult:
 		m.syncResult = &msg.result
+		m.scroll = 0
 		m.syncProgressLines = nil
 		m.syncProfilesCh = nil
 		m.syncProfilesResultCh = nil
@@ -1754,11 +1720,16 @@ func (m ssoConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case syncKubeProgressMsg:
+		if msg.line.msg == "" {
+			m.kubeDone, m.kubeTotal = msg.line.done, msg.line.total
+			return m, drainSyncKubeCh(m.kubeProgressCh, m.kubeResultCh)
+		}
 		m.kubeProgressLines = append(m.kubeProgressLines, msg.line)
 		return m, drainSyncKubeCh(m.kubeProgressCh, m.kubeResultCh)
 
 	case syncKubeMsgResult:
 		m.kubeResult = &msg.result
+		m.scroll = 0
 		m.kubeProgressLines = nil
 		m.kubeProgressCh = nil
 		m.kubeResultCh = nil
@@ -1776,6 +1747,20 @@ func (m ssoConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.step == ssoStepSyncing || m.step == ssoStepSyncingKube {
 				return m, nil // Esc no cancela durante sync
 			}
+			if m.step == ssoStepStaleConfirm {
+				m.step = ssoStepStaleSelect
+				return m, nil
+			}
+			if m.step == ssoStepStaleSelect || m.step == ssoStepStaleDone {
+				m.step = ssoStepMenu
+				m.cursor = 0
+				m.scroll = 0
+				m.syncResult = nil
+				m.kubeResult = nil
+				m.staleAccounts = nil
+				m.staleSel = nil
+				return m, nil
+			}
 			if m.step == ssoStepPick || m.step == ssoStepLoginPick || m.step == ssoStepSyncPick ||
 				m.step == ssoStepNewName || m.step == ssoStepEdit || m.step == ssoStepInfo ||
 				m.step == ssoStepSyncResult || m.step == ssoStepSyncKubeResult ||
@@ -1787,6 +1772,7 @@ func (m ssoConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.syncResult = nil
 				m.kubeResult = nil
 				m.loginErr = nil
+				m.scroll = 0
 				return m, nil
 			}
 			m.quitting = true
@@ -1802,7 +1788,21 @@ func (m ssoConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.Type {
+		case tea.KeyPgUp, tea.KeyPgDown:
+			if m.step == ssoStepSyncResult || m.step == ssoStepSyncKubeResult {
+				d := m.resultVisible() - 1
+				if msg.Type == tea.KeyPgUp {
+					d = -d
+				}
+				m.scroll = clampInt(m.scroll+d, 0, m.maxScroll())
+			}
+			return m, nil
+
 		case tea.KeyUp:
+			if m.step == ssoStepSyncResult || m.step == ssoStepSyncKubeResult {
+				m.scroll = clampInt(m.scroll-1, 0, m.maxScroll())
+				return m, nil
+			}
 			if m.isMenuStep() && m.cursor > 0 {
 				m.cursor--
 			}
@@ -1812,6 +1812,10 @@ func (m ssoConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case tea.KeyDown:
+			if m.step == ssoStepSyncResult || m.step == ssoStepSyncKubeResult {
+				m.scroll = clampInt(m.scroll+1, 0, m.maxScroll())
+				return m, nil
+			}
 			if m.isMenuStep() {
 				max := m.menuLen() - 1
 				if m.cursor < max {
@@ -1858,6 +1862,32 @@ func (m ssoConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor = 0
 				return m, nil
 			}
+			// Cuentas que dejaron de existir en SSO
+			if m.step == ssoStepSyncResult && string(msg.Runes) == "d" && m.syncResult != nil && len(m.syncResult.stale) > 0 {
+				return m.openStaleSelect(m.syncResult.stale), nil
+			}
+			if m.step == ssoStepSyncKubeResult && string(msg.Runes) == "d" && m.kubeResult != nil && len(m.kubeResult.stale) > 0 {
+				return m.openStaleSelect(m.kubeResult.stale), nil
+			}
+			if m.step == ssoStepStaleSelect && string(msg.Runes) == "a" {
+				all := true
+				for _, v := range m.staleSel {
+					all = all && v
+				}
+				for i := range m.staleSel {
+					m.staleSel[i] = !all
+				}
+				return m, nil
+			}
+			if m.step == ssoStepStaleConfirm && (string(msg.Runes) == "y" || string(msg.Runes) == "p") {
+				chosen := m.selectedStale()
+				m.staleWithClusters = string(msg.Runes) == "y" && countStaleClusters(chosen) > 0
+				m.staleRemoved = removeStaleAccounts(chosen, m.staleWithClusters)
+				m.staleAccounts = nil
+				m.staleSel = nil
+				m.step = ssoStepStaleDone
+				return m, nil
+			}
 			// Tecla 'y' desde confirm-delete → eliminar sesión + profiles
 			if m.step == ssoStepConfirmDelete && string(msg.Runes) == "y" {
 				return m.execDeleteSession(true), nil
@@ -1896,6 +1926,10 @@ func (m ssoConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case tea.KeySpace:
+			if m.step == ssoStepStaleSelect && m.cursor < len(m.staleSel) {
+				m.staleSel[m.cursor] = !m.staleSel[m.cursor]
+				return m, nil
+			}
 			if m.isInputStep() {
 				m.input += " "
 			}
@@ -2110,6 +2144,7 @@ func (m ssoConfigModel) handleSSOEnter() (tea.Model, tea.Cmd) {
 		// Enter → volver al menú
 		m.step = ssoStepMenu
 		m.cursor = 0
+		m.scroll = 0
 		m.syncResult = nil
 		return m, nil
 
@@ -2117,6 +2152,25 @@ func (m ssoConfigModel) handleSSOEnter() (tea.Model, tea.Cmd) {
 		// Enter → volver al menú
 		m.step = ssoStepMenu
 		m.cursor = 0
+		m.scroll = 0
+		m.kubeResult = nil
+		return m, nil
+
+	case ssoStepStaleSelect:
+		if len(m.selectedStale()) == 0 {
+			return m, nil // nada seleccionado
+		}
+		m.step = ssoStepStaleConfirm
+		return m, nil
+
+	case ssoStepStaleConfirm:
+		return m, nil // la confirmación es explícita con y / p
+
+	case ssoStepStaleDone:
+		m.step = ssoStepMenu
+		m.cursor = 0
+		m.scroll = 0
+		m.syncResult = nil
 		m.kubeResult = nil
 		return m, nil
 
@@ -2520,7 +2574,11 @@ func (m ssoConfigModel) View() string {
 
 	case ssoStepSyncing:
 		spinner := spinnerFrames[m.spinnerFrame]
-		lines = append(lines, "  "+okSt.Render(spinner)+" "+dim.Render("Fetching SSO accounts and syncing profiles..."))
+		phase := m.syncPhase
+		if phase == "" {
+			phase = "Contacting AWS SSO..."
+		}
+		lines = append(lines, "  "+okSt.Render(spinner)+" "+dim.Render(phase))
 		lines = append(lines, "")
 		maxLines := m.height - 8
 		if maxLines < 4 {
@@ -2537,16 +2595,8 @@ func (m ssoConfigModel) View() string {
 				lines = append(lines, "    "+warnSt.Render("✗")+" "+dim.Render(l.text))
 			}
 		}
-		if len(m.syncProgressLines) == 0 {
-			lines = append(lines, "  "+dim.Render("Contacting AWS SSO..."))
-		} else {
-			processed := len(m.syncProgressLines)
-			bar := tuiProgressBar(processed, m.syncTotal, 24)
-			lines = append(lines, "")
-			lines = append(lines, fmt.Sprintf("  %s  %s",
-				bar,
-				dim.Render(fmt.Sprintf("%d / %d  ·  ctrl+c to cancel", processed, m.syncTotal))))
-		}
+		lines = append(lines, "")
+		lines = append(lines, "  "+dim.Render("ctrl+c to cancel"))
 
 	case ssoStepSyncingKube:
 		spinner := spinnerFrames[m.spinnerFrame]
@@ -2567,15 +2617,18 @@ func (m ssoConfigModel) View() string {
 				lines = append(lines, "    "+warnSt.Render("✗")+" "+dim.Render(l.msg))
 			}
 		}
-		if len(m.kubeProgressLines) == 0 {
+		if len(m.kubeProgressLines) == 0 && m.kubeDone == 0 {
 			lines = append(lines, "  "+dim.Render("Querying AWS..."))
 		} else {
-			processed := len(m.kubeProgressLines)
-			bar := tuiProgressBar(processed, m.kubeTotal, 24)
+			processed, total := m.kubeDone, m.kubeTotal
+			if total < processed {
+				total = processed
+			}
+			bar := tuiProgressBar(processed, total, 24)
 			lines = append(lines, "")
 			lines = append(lines, fmt.Sprintf("  %s  %s",
 				bar,
-				dim.Render(fmt.Sprintf("%d / %d  ·  ctrl+c to cancel", processed, m.kubeTotal))))
+				dim.Render(fmt.Sprintf("%d / %d  ·  ctrl+c to cancel", processed, total))))
 		}
 
 	case ssoStepSyncKubeResult:
@@ -2586,26 +2639,13 @@ func (m ssoConfigModel) View() string {
 			lines = append(lines, "")
 			lines = append(lines, "  "+dim.Render(m.kubeResult.err.Error()))
 		} else {
-			lines = append(lines, "  "+okSt.Render(fmt.Sprintf("✔ Kubeconfig sync — %d added, %d skipped, %d failed",
-				m.kubeResult.added, m.kubeResult.skipped, m.kubeResult.failed)))
-			lines = append(lines, "")
-			shown := m.kubeResult.lines
-			if len(shown) > 12 {
-				shown = shown[:12]
-			}
-			for _, l := range shown {
-				if l.ok {
-					lines = append(lines, "    "+okSt.Render("✔")+" "+dim.Render(l.msg))
-				} else {
-					lines = append(lines, "    "+warnSt.Render("✗")+" "+dim.Render(l.msg))
-				}
-			}
-			if len(m.kubeResult.lines) > 12 {
-				lines = append(lines, "    "+dim.Render(fmt.Sprintf("... and %d more", len(m.kubeResult.lines)-12)))
-			}
+			lines = append(lines, m.scrollableReport()...)
 		}
 		lines = append(lines, "")
-		lines = append(lines, "  "+dim.Render("press enter or esc to go back to menu"))
+		if m.kubeResult != nil && len(m.kubeResult.stale) > 0 {
+			lines = append(lines, "  "+okSt.Render("→ [d] Review accounts no longer in SSO"))
+		}
+		lines = append(lines, "  "+dim.Render("  [↑↓ / pgup pgdn] scroll   [enter / esc] back to menu"))
 
 	case ssoStepSyncResult:
 		if m.syncResult == nil {
@@ -2617,34 +2657,134 @@ func (m ssoConfigModel) View() string {
 			lines = append(lines, "")
 			lines = append(lines, "  "+dim.Render("Make sure you are logged in first (Login option)."))
 		} else {
-			if m.syncResult.added == 0 && m.syncResult.fixed == 0 {
-				lines = append(lines, "  "+okSt.Render("✔ All profiles are up to date"))
-			} else {
-				lines = append(lines, "  "+okSt.Render(fmt.Sprintf("✔ Sync complete — %d added, %d fixed, %d total profiles",
-					m.syncResult.added, m.syncResult.fixed, m.syncResult.total)))
-			}
-			lines = append(lines, "")
-			// Mostrar hasta 12 líneas de detalle
-			shown := m.syncResult.lines
-			if len(shown) > 12 {
-				shown = shown[:12]
-			}
-			for _, l := range shown {
-				if l.ok {
-					lines = append(lines, "    "+okSt.Render("✔")+" "+dim.Render(l.text))
-				} else {
-					lines = append(lines, "    "+warnSt.Render("✗")+" "+dim.Render(l.text))
-				}
-			}
-			if len(m.syncResult.lines) > 12 {
-				lines = append(lines, "    "+dim.Render(fmt.Sprintf("... and %d more", len(m.syncResult.lines)-12)))
-			}
+			lines = append(lines, m.scrollableReport()...)
 		}
 		lines = append(lines, "")
 		if m.syncResult != nil && m.syncResult.err == nil {
+			if len(m.syncResult.stale) > 0 {
+				lines = append(lines, "  "+okSt.Render("→ [d] Review accounts no longer in SSO"))
+			}
 			lines = append(lines, "  "+okSt.Render("→ [k] Sync kubeconfig now"))
 		}
-		lines = append(lines, "  "+dim.Render("  [enter / esc] back to menu"))
+		lines = append(lines, "  "+dim.Render("  [↑↓ / pgup pgdn] scroll   [enter / esc] back to menu"))
+
+	case ssoStepStaleSelect:
+		lines = append(lines, "  "+rpWarn.Render("⚠ Accounts no longer in AWS SSO")+"  "+
+			dim.Render("↑↓ move · space select · a all · enter continue · esc back"))
+		lines = append(lines, "")
+		visible := m.height - 10
+		if visible < 4 {
+			visible = 4
+		}
+		start := 0
+		if m.cursor >= visible {
+			start = m.cursor - visible + 1
+		}
+		end := start + visible
+		if end > len(m.staleAccounts) {
+			end = len(m.staleAccounts)
+		}
+		// Anchos de columna para alinear
+		wProf, wID := 0, 12
+		for _, a := range m.staleAccounts {
+			if w := lipgloss.Width(strings.Join(a.Profiles, ", ")); w > wProf {
+				wProf = w
+			}
+		}
+		if maxProf := innerW - 40; wProf > maxProf && maxProf > 12 {
+			wProf = maxProf
+		}
+		if start > 0 {
+			lines = append(lines, "    "+dim.Render(fmt.Sprintf("↑ %d more above", start)))
+		}
+		for i := start; i < end; i++ {
+			a := m.staleAccounts[i]
+			box := dim.Render("[ ]")
+			if m.staleSel[i] {
+				box = rpWarn.Render("[x]")
+			}
+			prof := truncateCell(strings.Join(a.Profiles, ", "), wProf)
+			prof += strings.Repeat(" ", wProf-lipgloss.Width(prof))
+			clusters := dim.Render("no clusters in kubeconfig")
+			if len(a.Contexts) > 0 {
+				clusters = rpWarnTxt.Render(plural(len(a.Contexts), "cluster", "clusters") + " in kubeconfig")
+			}
+			pointer := "  "
+			nameSt := normalSt
+			if i == m.cursor {
+				pointer = sel.Render("❯ ")
+				nameSt = sel
+			}
+			lines = append(lines, "  "+pointer+box+" "+nameSt.Render(prof)+"  "+dim.Render(a.AccountID[:wID])+"  "+clusters)
+		}
+		if end < len(m.staleAccounts) {
+			lines = append(lines, "    "+dim.Render(fmt.Sprintf("↓ %d more below", len(m.staleAccounts)-end)))
+		}
+		lines = append(lines, "")
+		n := len(m.selectedStale())
+		lines = append(lines, "  "+dim.Render(fmt.Sprintf("%d of %d selected", n, len(m.staleAccounts))))
+
+	case ssoStepStaleConfirm:
+		chosen := m.selectedStale()
+		nClusters := countStaleClusters(chosen)
+		nProfiles := 0
+		for _, a := range chosen {
+			nProfiles += len(a.Profiles)
+		}
+		lines = append(lines, "  "+rpWarn.Render(fmt.Sprintf("⚠ Remove %s?", plural(len(chosen), "account", "accounts"))))
+		lines = append(lines, "")
+		lines = append(lines, "  "+label.Render(fmt.Sprintf("Profiles in ~/.aws/config (%d)", nProfiles)))
+		shownP := 0
+		maxRows := m.height - 17
+		if maxRows < 4 {
+			maxRows = 4
+		}
+		for _, a := range chosen {
+			for _, p := range a.Profiles {
+				if shownP >= maxRows {
+					break
+				}
+				lines = append(lines, "    "+rpWarnTxt.Render("·")+" "+textSt.Render(p)+"  "+dim.Render(a.AccountID))
+				shownP++
+			}
+		}
+		if nProfiles > shownP {
+			lines = append(lines, "    "+dim.Render(fmt.Sprintf("... and %d more", nProfiles-shownP)))
+		}
+		if nClusters > 0 {
+			lines = append(lines, "")
+			lines = append(lines, "  "+label.Render(fmt.Sprintf("Clusters in kubeconfig (%d)", nClusters)))
+			shownC := 0
+			for _, a := range chosen {
+				for _, c := range a.Contexts {
+					if shownC >= 6 {
+						break
+					}
+					lines = append(lines, "    "+rpWarnTxt.Render("·")+" "+textSt.Render(clusterNameFromContext(c))+"  "+dim.Render(regionFromContext(c)))
+					shownC++
+				}
+			}
+			if nClusters > shownC {
+				lines = append(lines, "    "+dim.Render(fmt.Sprintf("... and %d more", nClusters-shownC)))
+			}
+		}
+		lines = append(lines, "")
+		lines = append(lines, "  "+dim.Render("A backup of ~/.aws/config is created first."))
+		lines = append(lines, "")
+		if nClusters > 0 {
+			lines = append(lines, "  "+warnSt.Render("→ press y")+" "+dim.Render("  delete profiles + clusters"))
+			lines = append(lines, "  "+okSt.Render("→ press p")+" "+dim.Render("  delete profiles only, keep clusters"))
+		} else {
+			lines = append(lines, "  "+warnSt.Render("→ press y")+" "+dim.Render("  delete profiles"))
+		}
+		lines = append(lines, "  "+dim.Render("  press esc   back"))
+
+	case ssoStepStaleDone:
+		for _, l := range staleRemovalLines(m.staleRemoved, m.staleWithClusters) {
+			lines = append(lines, "  "+l)
+		}
+		lines = append(lines, "")
+		lines = append(lines, "  "+dim.Render("press enter or esc to go back to menu"))
 
 	case ssoStepDone:
 		if strings.HasPrefix(m.doneMsg, "✔") {
