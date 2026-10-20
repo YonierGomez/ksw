@@ -858,20 +858,31 @@
     <div class="install-step" style="padding:0; overflow:hidden; gap:0;">
       <div style="display:flex; align-items:center; gap:1rem; padding:.8rem 1.2rem; flex:1;">
         <span class="step-num">2</span>
+        <span><span style="color:var(--gray)">brew trust </span>yoniergomez/ksw</span>
+      </div>
+      <button onclick="event.stopPropagation(); copyCmd(this,'brew trust yoniergomez/ksw')" title="Copy" style="flex-shrink:0; background:var(--bg2); border:none; border-left:1px solid var(--border); cursor:pointer; color:var(--gray); font-size:.85rem; padding:.5rem .8rem; transition:color .2s, background .2s; align-self:stretch;">⎘</button>
+    </div>
+    <div class="install-step" style="padding:0; overflow:hidden; gap:0;">
+      <div style="display:flex; align-items:center; gap:1rem; padding:.8rem 1.2rem; flex:1;">
+        <span class="step-num">3</span>
         <span><span style="color:var(--gray)">brew install </span>ksw</span>
       </div>
       <button onclick="event.stopPropagation(); copyCmd(this,'brew install ksw')" title="Copy" style="flex-shrink:0; background:var(--bg2); border:none; border-left:1px solid var(--border); cursor:pointer; color:var(--gray); font-size:.85rem; padding:.5rem .8rem; transition:color .2s, background .2s; align-self:stretch;">⎘</button>
     </div>
     <div class="install-step" style="padding:0; overflow:hidden; gap:0;">
       <div style="display:flex; align-items:center; gap:1rem; padding:.8rem 1.2rem; flex:1;">
-        <span class="step-num">3</span>
+        <span class="step-num">4</span>
         <span><span style="color:var(--cyan)">ksw</span></span>
       </div>
       <button onclick="event.stopPropagation(); copyCmd(this,'ksw')" title="Copy" style="flex-shrink:0; background:var(--bg2); border:none; border-left:1px solid var(--border); cursor:pointer; color:var(--gray); font-size:.85rem; padding:.5rem .8rem; transition:color .2s, background .2s; align-self:stretch;">⎘</button>
     </div>
   </div>
 
-  <p style="margin-top:2rem; color: var(--gray); font-size:.85rem;">
+  <p style="margin-top:1.5rem; color: var(--gray); font-size:.8rem;">
+    Homebrew 6+ requires you to trust third-party taps once before installing from them (<code style="color:var(--cyan); font-family:'JetBrains Mono',monospace;">brew trust</code>).
+  </p>
+
+  <p style="margin-top:1rem; color: var(--gray); font-size:.85rem;">
     To upgrade: <code style="color:var(--cyan); font-family:'JetBrains Mono',monospace;">brew upgrade ksw</code>
   </p>
 

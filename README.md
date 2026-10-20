@@ -58,6 +58,7 @@ curl -sL https://raw.githubusercontent.com/YonierGomez/ksw/main/install.sh | bas
 
 ```bash
 brew tap YonierGomez/ksw
+brew trust yoniergomez/ksw   # Homebrew 6+ requires trusting third-party taps
 brew install ksw
 ```
 
@@ -273,11 +274,14 @@ ksw eks kubeconfig sync
 #   ⠸ Scanning profiles... ████████████░░░░░░░░  127 / 257
 #   ✔ profile 'payments-dev' [us-east-1] — 2 cluster(s) found
 #   ✔ added eks-payments-dev  (payments-dev)
-#   ✔ Done — 3 added, 12 skipped, 0 failed
+#   ✔ Kubeconfig sync — 3 added  12 skipped  ·  0 failed
+#   (followed by a table with the clusters added, grouped by profile / account)
 
 # Sync only one profile
 ksw eks kubeconfig sync --profile payments-dev
 ```
+
+After a full sync, the report lists the **new clusters per account** (★ marks accounts that had no clusters in your kubeconfig before). Transient AWS CLI errors (SSO token refresh races, throttling, timeouts) are retried automatically, and a cluster is only skipped when the kubeconfig already has the exact same ARN (region + account + name).
 
 ---
 
@@ -338,6 +342,17 @@ ksw aws sso profiles sync --session my-session
 ksw aws sso profiles list
 ksw aws sso profiles search payments
 ```
+
+### Sync report
+
+`profiles sync` (CLI and TUI) shows a table with every **new account added** (profile, account ID, SSO account name) and the profiles that were renamed or had their account ID fixed. `~/.aws/config` is backed up before it is modified.
+
+If an account no longer exists in AWS SSO but still has a profile in `~/.aws/config`, it is listed under **NO LONGER IN AWS SSO** and you can choose to remove its profile(s) and the EKS clusters that belonged to it from your kubeconfig. Nothing is removed without confirmation:
+
+- **TUI** — press `d` on the sync result, select accounts with `space` (`a` = all), then `y` (profiles + clusters) or `p` (profiles only).
+- **CLI** — answer the prompt (`y` all / `s` select / `N` none).
+
+The same check runs after `ksw eks kubeconfig sync` (full sync) and after *Sync kubeconfig* in the TUI. Only profiles that belong to the SSO session you are logged in to are evaluated.
 
 ---
 

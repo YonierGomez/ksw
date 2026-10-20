@@ -53,6 +53,10 @@ type eksSyncLine struct {
 	cluster string
 	profile string
 	msg     string
+
+	// Progreso real: si msg == "" la línea solo actualiza la barra (done de total pasos)
+	done  int
+	total int
 }
 
 // eksSyncResultData acumula resultados de un sync EKS
@@ -62,6 +66,20 @@ type eksSyncResultData struct {
 	skipped int
 	failed  int
 	err     error
+
+	// Detalle estructurado para los reportes (CLI y TUI)
+	addedClusters []eksAddedCluster // clusters agregados al kubeconfig en esta ejecución
+	stale         []staleAccount    // cuentas con profile que ya no existen en SSO
+	staleNote     string            // motivo si no se pudo verificar alguna sesión
+}
+
+// eksAddedCluster es un cluster que se agregó al kubeconfig durante el sync.
+type eksAddedCluster struct {
+	Cluster    string
+	Profile    string
+	Region     string
+	AccountID  string // account ID del profile ("" si el profile no es SSO)
+	NewAccount bool   // true si el kubeconfig no tenía ningún cluster de esa cuenta
 }
 
 // eksClusterEntry representa un cluster en kubeconfig
@@ -102,6 +120,8 @@ type eksTUIModel struct {
 	// resultados sync
 	syncResult    *eksSyncResultData
 	progressLines []eksSyncLine             // líneas en vivo durante sync
+	progressDone  int                       // pasos completados (barra de progreso)
+	progressTotal int                       // pasos totales conocidos hasta ahora
 	syncProgressCh <-chan eksSyncLine        // canal de progreso activo
 	syncResultCh   <-chan eksSyncResultData  // canal de resultado final
 	spinnerFrame  int
@@ -215,12 +235,18 @@ func (m eksTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case eksSyncProgressMsg:
+		if msg.line.msg == "" {
+			// Línea de solo progreso: actualiza la barra sin agregar texto
+			m.progressDone, m.progressTotal = msg.line.done, msg.line.total
+			return m, drainSyncCh(m.syncProgressCh, m.syncResultCh)
+		}
 		m.progressLines = append(m.progressLines, msg.line)
 		return m, drainSyncCh(m.syncProgressCh, m.syncResultCh)
 
 	case eksSyncDoneMsg:
 		m.syncResult = &msg.result
 		m.progressLines = nil
+		m.progressDone, m.progressTotal = 0, 0
 		m.syncProgressCh = nil
 		m.syncResultCh = nil
 		existing, _ := getExistingEKSContexts()
@@ -371,6 +397,7 @@ func (m eksTUIModel) handleEnter() (tea.Model, tea.Cmd) {
 			m.step = eksStepSyncing
 			m.spinnerFrame = 0
 			m.progressLines = nil
+			m.progressDone, m.progressTotal = 0, 0
 			pCh, rCh, drainCmd := startEKSSync(m.profiles)
 			m.syncProgressCh = pCh
 			m.syncResultCh = rCh
@@ -430,6 +457,7 @@ func (m eksTUIModel) handleEnter() (tea.Model, tea.Cmd) {
 		m.step = eksStepSyncing
 		m.spinnerFrame = 0
 		m.progressLines = nil
+		m.progressDone, m.progressTotal = 0, 0
 		pCh, rCh, drainCmd := startEKSSync([]awsProfile{selected})
 		m.syncProgressCh = pCh
 		m.syncResultCh = rCh
@@ -651,12 +679,15 @@ func (m eksTUIModel) View() string {
 				lines = append(lines, "  "+eksDimSt.Render("Querying AWS..."))
 			} else {
 				barWidth := 24
-				processed := len(m.progressLines)
-				bar := tuiProgressBar(processed, m.profileCount, barWidth)
+				processed, total := m.progressDone, m.progressTotal
+				if total < processed {
+					total = processed
+				}
+				bar := tuiProgressBar(processed, total, barWidth)
 				lines = append(lines, "")
 				lines = append(lines, fmt.Sprintf("  %s  %s",
 					bar,
-					eksDimSt.Render(fmt.Sprintf("%d / %d  ·  ctrl+c to cancel", processed, m.profileCount))))
+					eksDimSt.Render(fmt.Sprintf("%d / %d  ·  ctrl+c to cancel", processed, total))))
 			}
 		}
 
@@ -844,6 +875,11 @@ func runEKSSyncTUIStreaming(profiles []awsProfile, progressCh chan<- eksSyncLine
 		res.lines = append(res.lines, line)
 		progressCh <- line
 	}
+	// sendProgress solo mueve la barra; no aparece en la lista ni en el resultado final
+	sendProgress := func(done, total int) {
+		progressCh <- eksSyncLine{done: done, total: total}
+	}
+	sendProgress(0, len(profiles))
 
 	if err := checkAWSCLI(); err != nil {
 		res.err = err
@@ -851,7 +887,9 @@ func runEKSSyncTUIStreaming(profiles []awsProfile, progressCh chan<- eksSyncLine
 	}
 
 	// ── Fase 1: listar clusters por perfil en paralelo (máx 32 concurrentes) ──
-	const maxConcurrent = 32
+	warmUpSSOTokens(profiles)
+	profileDetails := readProfileDetails()
+	const maxConcurrent = 16
 	sem := make(chan struct{}, maxConcurrent)
 
 	type profileResult struct {
@@ -870,14 +908,18 @@ func runEKSSyncTUIStreaming(profiles []awsProfile, progressCh chan<- eksSyncLine
 	}
 
 	var allDiscovered []eksCluster
+	processed := 0
 	for range profiles {
 		r := <-listCh
+		processed++
+		sendProgress(processed, len(profiles))
 		if r.err != nil {
 			send(eksSyncLine{ok: false, msg: fmt.Sprintf("profile '%s' (%s): %s", r.profile.Name, r.profile.Region, r.err.Error())})
 			continue
 		}
 		for _, c := range r.clusters {
-			allDiscovered = append(allDiscovered, eksCluster{Name: c, Profile: r.profile.Name, Region: r.profile.Region})
+			allDiscovered = append(allDiscovered, eksCluster{Name: c, Profile: r.profile.Name, Region: r.profile.Region,
+				AccountID: profileDetails[r.profile.Name].AccountID})
 		}
 		if len(r.clusters) == 0 {
 			send(eksSyncLine{ok: true, msg: fmt.Sprintf("profile '%s' [%s] — no clusters", r.profile.Name, r.profile.Region)})
@@ -894,6 +936,15 @@ func runEKSSyncTUIStreaming(profiles []awsProfile, progressCh chan<- eksSyncLine
 	existing, _ := getExistingEKSContexts()
 	newClusters, existingClusters := partitionClusters(allDiscovered, existing)
 
+	// Cuentas que ya tenían clusters en el kubeconfig (para marcar las cuentas nuevas)
+	knownAccounts := make(map[string]bool)
+	for ctx := range existing {
+		if id := accountIDFromContext(ctx); id != "" {
+			knownAccounts[id] = true
+		}
+	}
+	details := readProfileDetails()
+
 	for _, c := range existingClusters {
 		send(eksSyncLine{ok: true, msg: fmt.Sprintf("skipped %s (already in kubeconfig)", c.Name)})
 		res.skipped++
@@ -902,6 +953,10 @@ func runEKSSyncTUIStreaming(profiles []awsProfile, progressCh chan<- eksSyncLine
 	if len(newClusters) == 0 {
 		return res
 	}
+
+	// El total ahora incluye un paso por cada cluster nuevo a agregar
+	totalSteps := len(profiles) + len(newClusters)
+	sendProgress(processed, totalSteps)
 
 	mainKubeconfig := os.Getenv("KUBECONFIG")
 	if mainKubeconfig == "" {
@@ -936,6 +991,8 @@ func runEKSSyncTUIStreaming(profiles []awsProfile, progressCh chan<- eksSyncLine
 	var tmpFiles []string
 	for range newClusters {
 		s := <-syncCh
+		processed++
+		sendProgress(processed, totalSteps)
 		if s.err != nil {
 			send(eksSyncLine{ok: false, msg: fmt.Sprintf("failed %s: %s", s.cluster.Name, s.err.Error())})
 			res.failed++
@@ -943,6 +1000,14 @@ func runEKSSyncTUIStreaming(profiles []awsProfile, progressCh chan<- eksSyncLine
 			send(eksSyncLine{ok: true, cluster: s.cluster.Name, profile: s.cluster.Profile,
 				msg: fmt.Sprintf("added %s  (%s)", s.cluster.Name, s.cluster.Profile)})
 			tmpFiles = append(tmpFiles, s.tmpFile)
+			accountID := details[s.cluster.Profile].AccountID
+			res.addedClusters = append(res.addedClusters, eksAddedCluster{
+				Cluster:    s.cluster.Name,
+				Profile:    s.cluster.Profile,
+				Region:     s.cluster.Region,
+				AccountID:  accountID,
+				NewAccount: accountID != "" && !knownAccounts[accountID],
+			})
 			res.added++
 		}
 	}
@@ -1046,7 +1111,7 @@ func removeStaleClusters(stale []string) (removed int, failed int) {
 		toRemove[s] = true
 	}
 
-	kubePath := os.ExpandEnv("$HOME/.kube/config")
+	kubePath := mainKubeconfigPath()
 	data, err := os.ReadFile(kubePath)
 	if err != nil {
 		failed = len(stale)
@@ -1082,7 +1147,10 @@ func removeStaleClusters(stale []string) (removed int, failed int) {
 						name := strings.TrimSpace(strings.TrimPrefix(inner, "name:"))
 						if toRemove[name] {
 							matched = true
-							removed++
+							// Cada cluster se cuenta una sola vez (por su contexto)
+							if prefix == "- context:" {
+								removed++
+							}
 						}
 						break
 					}
@@ -1090,6 +1158,19 @@ func removeStaleClusters(stale []string) (removed int, failed int) {
 			}
 			if matched {
 				break
+			}
+		}
+
+		// Entradas de users generadas por kubectl/aws: "- name: <ctx>" seguido de "user:"
+		if !matched && strings.HasPrefix(trimmed, "- name:") {
+			name := strings.TrimSpace(strings.TrimPrefix(trimmed, "- name:"))
+			if toRemove[name] {
+				for j := i + 1; j < len(lines) && j < i+3; j++ {
+					if strings.TrimSpace(lines[j]) == "user:" || strings.HasPrefix(strings.TrimSpace(lines[j]), "user:") {
+						matched = true
+						break
+					}
+				}
 			}
 		}
 

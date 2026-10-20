@@ -62,6 +62,7 @@ jobs:
             ### Homebrew (macOS / Linux)
             ```bash
             brew tap YonierGomez/ksw
+            brew trust yoniergomez/ksw   # Homebrew 6+: trust third-party taps
             brew install ksw
             ```
 
