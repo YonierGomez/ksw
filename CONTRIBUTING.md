@@ -21,8 +21,16 @@ Complete reference for building, releasing, and maintaining the project.
 
 ```
 .
-├── main.go                  # All application code (single file)
+├── main.go                  # Entry point, config (~/.ksw.json), fuzzy search, the plain list view
+├── ctx_view.go              # Cluster views — logic: context parsing, tabs, ordering, grouping, navigation, Ctrl+V picker
+├── ctx_render.go            # Cluster views — rendering (columns, tree, matrix, cards, grid, split, kubectx...)
 ├── ai.go                    # AI/Bedrock integration
+├── aws_sso.go               # `ksw aws sso` TUI/CLI, profile sync engine
+├── aws_stale.go             # SSO tokens per session, retired-account detection and removal
+├── aws_sync_ui.go           # Sync reports (tables) and CLI prompts
+├── eks.go / eks_tui.go      # EKS kubeconfig sync (CLI + TUI), cluster matching, retries
+├── k8s_tui.go               # `ksw k8s` resource explorer
+├── license.go               # Premium license handling
 ├── go.mod / go.sum          # Go module files
 ├── install.sh               # One-line installer (auto-detects OS/arch)
 ├── index.html               # Landing page (GitHub Pages)
@@ -49,7 +57,7 @@ Complete reference for building, releasing, and maintaining the project.
 The version is defined as a constant at the top of `main.go`:
 
 ```go
-const version = "1.3.3"
+const version = "x.y.z"
 ```
 
 All of the following must match on every release:
@@ -79,6 +87,25 @@ GOOS=darwin  GOARCH=amd64  go build -ldflags "-s -w" -o dist/ksw-darwin-amd64  .
 GOOS=linux   GOARCH=amd64  go build -ldflags "-s -w" -o dist/ksw-linux-amd64   .
 GOOS=linux   GOARCH=arm64  go build -ldflags "-s -w" -o dist/ksw-linux-arm64   .
 ```
+
+---
+
+## Cluster views (architecture)
+
+The interactive selector (`ksw`) supports several views, chosen with `Ctrl+V` and stored in `~/.ksw.json` (`view_mode`).
+
+- **`ctx_view.go`** holds everything that is not drawing: `parseContextInfo` (region / account / profile / environment derived from the context ARN and `~/.aws/config`, no AWS calls), tabs, ordering per view (`arrange`), grouping (`groupOf`, `layoutRows`), key handling (`handleViewKey`), per-view scrolling (`ensureVisibleView`) and the view registry (`viewSpecs`).
+- **`ctx_render.go`** holds the renderers (`viewTable`, `viewMatrix`, `viewCards`, `viewGrid`, `viewSplit`, `viewSimple`, `viewKubectx`, `viewPicker`) and the shared pieces: `headLines` (current + selected cluster's profile / account / ARN + search + tabs), `footerLine` (counter and key hints in blocks) and `finish`.
+- The original list (`viewList` in `main.go`) is the default and must keep working on its own; every new view falls back to it on terminals narrower than 90 columns (`kubectx` works at any width).
+- Display names go through `nameOf` / `padName` so `Ctrl+H` (short ↔ full names) works in every view.
+- Layout contract: a view returns exactly `terminalHeight` lines (no trailing newline) with the footer on the last row. `maxVisible` reserves the chrome lines per view and `window` reuses the unused indicator lines for extra rows, so lists fill the screen.
+
+### Adding a view
+
+1. Add a `view…` constant and an entry in `viewSpecs` (`ctx_view.go`).
+2. Decide ordering in `arrange` and whether it uses tabs (`usesTabs`) or group headers (`headersActive`).
+3. Add the renderer in `ctx_render.go`, wire it in `View()` and adjust `maxVisible` (`main.go`) if its chrome differs.
+4. Document it in the README table and make sure it still returns exactly `terminalHeight` lines at narrow and wide sizes, with long names, with an empty result and with `Ctrl+H` toggled.
 
 ---
 
@@ -148,8 +175,10 @@ The release is fully automated via `scripts/release.sh`.
 ### If `brew upgrade` says "already installed" but `ksw -v` shows wrong version
 
 ```bash
-brew reinstall ksw
+brew update && brew reinstall ksw
 ```
+
+> **Homebrew 6+:** third-party taps must be trusted once — `brew trust yoniergomez/ksw` (after `brew tap YonierGomez/ksw`). The README, the landing page and the GitHub release notes all include this step.
 
 ---
 

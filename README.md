@@ -11,7 +11,7 @@
 [![Linux](https://img.shields.io/badge/Linux-arm64%20%7C%20amd64-FCC624?style=flat-square&logo=linux&logoColor=black)](https://github.com/YonierGomez/ksw/releases/latest)
 [![GitHub Stars](https://img.shields.io/github/stars/YonierGomez/ksw?style=flat-square&logo=github)](https://github.com/YonierGomez/ksw/stargazers)
 
-Switch contexts with natural language, manage groups, pins and aliases. Sync AWS SSO profiles and EKS clusters to kubeconfig automatically. Single binary, no runtime dependencies.
+Switch contexts with natural language, manage groups, pins and aliases. Browse hundreds of clusters in 11 switchable views (environment-aware, with profile and account), sync AWS SSO profiles and EKS clusters to kubeconfig automatically and clean up retired accounts. Single binary, no runtime dependencies.
 
 > Available for **macOS** and **Linux** (amd64 & arm64).
 
@@ -27,7 +27,10 @@ Switch contexts with natural language, manage groups, pins and aliases. Sync AWS
 
 ### Free
 
-- **Fuzzy search** — type any part of a context name to filter instantly
+- **Fuzzy search** — type any part of a context name to filter instantly (it also matches profile and environment)
+- **11 cluster views** (`Ctrl+V`) — plain list, kubectx-style, columns with env tabs, grouped, foldable tree, by region, apps × environments matrix, one card per app, multi-column grid, split with detail panel. Your choice is remembered — see [Cluster views](#cluster-views)
+- **Environment & profile aware** — `-dev` / `-qa` / `-pdn` / `-prod` / `-sbx` / `-lab` detected from the name (production in red) and the AWS profile of the account shown for the selected cluster
+- **Short / full names** — `Ctrl+H` toggles `eks-payments-dev` ↔ full ARN in every view
 - **Short-name switching** — `ksw payments-dev` instead of the full ARN
 - **Aliases** — `ksw @prod` gets you there instantly
 - **Pins** — pin favorites to always appear at the top (`Ctrl+P` in TUI)
@@ -40,7 +43,9 @@ Switch contexts with natural language, manage groups, pins and aliases. Sync AWS
 - **K8s resource explorer** (`ksw k8s`) — interactive TUI to browse pods, deployments, services, nodes and more with per-cell semantic coloring, horizontal scroll, multi-select delete, label-based logs and live metrics
 - **AWS SSO config TUI** (`ksw aws sso config`) — create, edit, delete SSO sessions, login, sync profiles and kubeconfig — all from an interactive TUI
 - **AWS SSO login** (`ksw aws sso login`) — login to any configured SSO session
-- **Profile sync** (`ksw aws sso profiles sync`) — auto-scan SSO accounts and sync all profiles to `~/.aws/config` with live progress
+- **Profile sync** (`ksw aws sso profiles sync`) — auto-scan SSO accounts and sync all profiles to `~/.aws/config` with live progress and a **report of every new account added** (profile, account ID, SSO name)
+- **Retired-account cleanup** — accounts that no longer exist in AWS SSO are detected after a sync, and you can remove their profile **and** their clusters from the kubeconfig (selection + confirmation, with a backup of `~/.aws/config`)
+- **Reliable sync** — exact-ARN cluster matching, SSO token selection/refresh, retries on transient AWS CLI errors and deterministic profile renames
 - **Profile management** (`ksw aws sso profiles list/add/search`) — list, add and search AWS profiles
 - **Shell completion** — zsh and bash
 
@@ -188,16 +193,60 @@ ksw -v, --version                # Version
 |--------------|-------------------------------------|
 | Type         | Fuzzy filter in real time           |
 | `↑` / `↓`   | Move up / down                      |
-| `Home`/`End` | Go to top / bottom                  |
+| `Home`/`End` or `Ctrl+A`/`Ctrl+E` | Go to top / bottom (Ctrl works on keyboards without Home/End) |
 | `PgUp/PgDn`  | Jump 10 items                       |
 | `Backspace`  | Delete filter character             |
 | `Enter`      | Switch to highlighted context       |
 | `Ctrl+P`     | Pin / unpin current context (★)     |
 | `Ctrl+T`     | Jump to first pinned context        |
 | `Ctrl+F`     | Toggle pinned-only filter           |
-| `Ctrl+H`     | Toggle short name view (persisted)  |
+| `Ctrl+H`     | Toggle short / full names (works in every view, persisted) |
+| `←` / `→` / `Tab` | Switch tab (All · dev · qa · pdn · prod · sbx · lab · ★ pins · ⏱ recent) in table views |
+| `Space`      | Fold / unfold group (tree, region) |
+| `Ctrl+V`     | Open the view picker (persisted)    |
 | `Esc`        | Clear filter / Quit                 |
 | `Ctrl+C`     | Quit                                |
+
+### Cluster views
+
+`ksw` starts with the plain list. Press `Ctrl+V` to open the **view picker** (↑↓ + Enter, or `Ctrl+V` again for the next one); your choice is remembered in `~/.ksw.json` (`view_mode`). Terminals narrower than 90 columns always use the plain list (`kubectx` works at any width).
+
+| View | What it shows |
+|------|---------------|
+| `list` (default) | The original flat list, with the AWS profile of the selected cluster next to `current` |
+| `kubectx` | fzf-style like [kubectx](https://github.com/ahmetb/kubectx): full-screen list of names, best match at the bottom next to the prompt. The row under the cursor is bright blue on a soft band, the rest is dimmed and the current context is green. `↑` goes up the screen |
+| `simple` | A plain list like the original, plus environment and profile on every row |
+| `columns` | Table: cluster · environment · profile (· region when you have several), with tabs: All · dev · qa · pdn · prod · sbx · lab · ★ pins · ⏱ recent |
+| `grouped` | Same table grouped by application (all the environments of an app together), with a header per group |
+| `tree` | Foldable tree by application — `Space` folds, `Enter` on a folded group unfolds it |
+| `region` | Foldable tree by AWS region |
+| `matrix` | Applications × environments grid (`●` per cluster) — move with `←↑↓→` |
+| `cards` | One card per application with all its environments together (`dev` / `qa` / `pdn`…); missing ones show as `none`. `↑↓` move, `←→` jump between cards |
+| `grid` | Cluster names in several columns, `ls` style — `←→` change column, `Tab` switches tab |
+| `split` | List on the left, detail panel on the right (needs ≥ 110 columns) |
+
+```
+# cards
+╭─ payments ──────────────────── ● ● ● ╮
+│ ❯ DEV  eks-payments-dev   pay-dev    │
+│   QA   eks-payments-qa    pay-qa     │
+│   PDN  eks-payments-pdn   pay-pdn    │
+╰──────────────────────────────────────╯
+
+# tree  (Space folds a group)
+▾ payments 3
+├─ eks-payments-dev   DEV
+├─ eks-payments-qa    QA
+└─ eks-payments-pdn   PDN
+▸ orders 2
+```
+
+- **Environments** are detected from the cluster-name suffix (`-dev`, `-qa`, `-pdn`, `-prod`, `-sbx`, `-lab`), production in red. Contexts without a known suffix (and non-EKS contexts) simply show `—` and stay in **All** — there is no separate bucket.
+- **Profile**: matched by the account ID in the context ARN against `sso_account_id` in `~/.aws/config`.
+- **Detail at the top**: the selected cluster's profile · account · region and full ARN sit under `current` and follow the cursor. The bottom line only holds the counter and the key hints (grouped as navigation │ actions │ views) and is always pinned to the last row; lists fill the screen down to it.
+- **Search** also matches profile and environment, and grouped views keep their structure while you type — only the matching clusters (and their groups) stay.
+- **`Ctrl+H`** switches every view between short names and full ARNs (long names are cut on the left so the cluster name stays visible). **`Ctrl+A` / `Ctrl+E`** jump to the top / bottom (also `Home` / `End`).
+- Everything is derived locally from the context ARN and `~/.aws/config` — no AWS calls.
 
 ---
 
@@ -335,9 +384,6 @@ ksw aws sso login my-session
 # Sync all SSO accounts to ~/.aws/config
 ksw aws sso profiles sync
 
-# Sync only one SSO session
-ksw aws sso profiles sync --session my-session
-
 # List / search profiles
 ksw aws sso profiles list
 ksw aws sso profiles search payments
@@ -387,6 +433,8 @@ All settings are stored in `~/.ksw.json`:
 {
   "aliases": { "prod": "arn:aws:eks:us-east-1:111122223333:cluster/eks-payments-dev" },
   "pins": ["arn:aws:eks:us-east-1:111122223333:cluster/eks-payments-dev"],
+  "short_names": true,
+  "view_mode": "cards",
   "history": ["arn:aws:eks:.../eks-payments-dev", "arn:aws:eks:.../eks-payments-qa"],
   "previous": "arn:aws:eks:us-east-1:444455556666:cluster/eks-payments-qa",
   "ai": {
@@ -426,6 +474,8 @@ All settings are stored in `~/.ksw.json`:
 - [x] `ksw aws sso config` — AWS SSO session manager ✅
 - [x] `ksw aws sso profiles sync` — auto-sync SSO profiles ✅
 - [x] `ksw k8s` — interactive K8s resource explorer with live metrics ✅
+- [x] 11 switchable cluster views with environment / profile awareness ✅
+- [x] Sync reports + retired-account cleanup (profiles and clusters) ✅
 - [ ] `ksw ai` — support for local models (Ollama)
 - [ ] `ksw diff` — compare two contexts side by side
 - [ ] `ksw export` / `ksw import` — share config across machines

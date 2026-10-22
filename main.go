@@ -14,7 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const version = "1.8.0"
+const version = "1.9.0"
 
 // ── Styles ─────────────────────────────────────────────
 var (
@@ -84,6 +84,7 @@ type config struct {
 	Previous   string              `json:"previous,omitempty"`
 	Pins       []string            `json:"pins,omitempty"`
 	ShortNames bool                `json:"short_names,omitempty"`
+	ViewMode   string              `json:"view_mode,omitempty"` // list (default) | simple | columns | grouped | tree | region | matrix | cards | grid | split
 	Groups     map[string][]string `json:"groups,omitempty"`
 	AI         aiConfig            `json:"ai,omitempty"`
 	AIMemory   []aiMemoryEntry     `json:"ai_memory,omitempty"`
@@ -324,6 +325,19 @@ type model struct {
 	shortNames      bool
 	activeGroup     string // "" = all contexts
 	showPinnedOnly  bool   // Ctrl+F toggle
+
+	// Vista de columnas / agrupada (ver ctx_view.go)
+	view      string          // list (default) | simple | columns | grouped | tree | region | matrix | cards | grid | split
+	infos     []ctxInfo       // información derivada de cada contexto (paralelo a contexts)
+	tabs      []ctxTab        // pestañas: All, ambientes, pins, recent
+	tab       int             // pestaña activa
+	recent    map[string]int  // contexto → recencia (0 = actual)
+	rows      []dispRow       // filas de pantalla con encabezados de grupo (nil si no aplica)
+	toggled   map[string]bool // grupos plegados/desplegados por el usuario
+	picker    bool            // selector de vistas abierto (Ctrl+V)
+	pickerCur int
+	mcol      int  // columna "deseada" de la matriz al moverse en vertical
+	mcolSet   bool // true si mcol está vigente (se descarta al cambiar la lista)
 }
 
 // shortName extracts the last segment after '/' from a context name
@@ -344,7 +358,15 @@ func initialModel(contexts []string, current string, cfg config, activeGroup str
 		shortNames:     cfg.ShortNames,
 		activeGroup:    activeGroup,
 		showPinnedOnly: pinnedOnly,
+		view:           normalizeView(cfg.ViewMode),
+		toggled:        make(map[string]bool),
 	}
+	profiles := profileByAccountID()
+	m.infos = make([]ctxInfo, len(contexts))
+	for i, c := range contexts {
+		m.infos[i] = parseContextInfo(c, profiles)
+	}
+	m.tabs = buildTabs(m.infos)
 	m.resetFilter()
 	for i, idx := range m.filtered {
 		if contexts[idx] == current {
@@ -406,18 +428,22 @@ func (m *model) groupSet() map[string]bool {
 }
 
 func (m *model) resetFilter() {
+	if m.search != "" {
+		// Hay una búsqueda activa (p.ej. tras pin/unpin): conservar sus resultados
+		m.applyFilter()
+		m.scrollOffset = 0
+		return
+	}
+	m.refreshRecent()
 	gs := m.groupSet()
 	var indices []int
-	for i, ctx := range m.contexts {
-		if gs != nil && !gs[ctx] {
-			continue
-		}
-		if m.showPinnedOnly && !m.isPinned(ctx) {
+	for i := range m.contexts {
+		if !m.baseSet(i, gs) || !m.inTab(i) {
 			continue
 		}
 		indices = append(indices, i)
 	}
-	m.filtered = m.sortedByPins(indices)
+	m.filtered, m.rows = m.layoutRows(m.arrange(indices))
 	m.scrollOffset = 0
 }
 
@@ -428,6 +454,7 @@ func (m *model) applyFilter() {
 	}
 
 	query := m.search
+	m.refreshRecent()
 	gs := m.groupSet()
 
 	// Build searchable strings: context name + any aliases pointing to it
@@ -438,16 +465,17 @@ func (m *model) applyFilter() {
 
 	var results []scored
 	for i, ctx := range m.contexts {
-		if gs != nil && !gs[ctx] {
-			continue
-		}
-		if m.showPinnedOnly && !m.isPinned(ctx) {
+		if !m.baseSet(i, gs) || !m.inTab(i) {
 			continue
 		}
 		// Match against context name
 		searchable := ctx
 		if aliases, ok := reverseAlias[ctx]; ok {
 			searchable += " " + strings.Join(aliases, " ")
+		}
+		// También por profile y ambiente (visibles en la vista de columnas)
+		if i < len(m.infos) {
+			searchable += " " + m.infos[i].Profile + " " + m.infos[i].Env
 		}
 		score := fuzzyMatch(searchable, query)
 		if score > 0 {
@@ -464,14 +492,38 @@ func (m *model) applyFilter() {
 	for _, r := range results {
 		indices = append(indices, r.index)
 	}
-	m.filtered = m.sortedByPins(indices)
+	switch {
+	case m.headersActive():
+		// Las vistas con grupos conservan su estructura al buscar: solo quedan los items que coinciden
+		m.filtered, m.rows = m.layoutRows(m.orderForSearch(indices))
+	case m.ev() == viewMatrix || m.ev() == viewCards:
+		m.filtered = m.sortMatrix(indices) // matriz y tarjetas necesitan el orden app/ambiente
+		m.rows = nil
+	default:
+		m.filtered = m.sortedByPins(indices)
+		m.rows = nil
+	}
 	if m.cursor >= len(m.filtered) {
 		m.cursor = max(0, len(m.filtered)-1)
 	}
 }
 
 func (m *model) maxVisible() int {
-	headerLines := 8
+	if m.ev() == viewKubectx {
+		return max(3, m.terminalHeight-2) // solo quedan el contador y el prompt abajo
+	}
+	headerLines := 6
+	if m.tableMode() {
+		// current + 2 detalle + search + tabs + sep + columnas + 2 indicadores + sep + footer
+		headerLines = 9
+		// Las vistas sin pestañas (simple, matrix, cards) no tienen la fila de pestañas ni subtítulo
+		switch m.ev() {
+		case viewMatrix:
+			headerLines = 9 // + leyenda − pestañas
+		case viewCards, viewSimple:
+			headerLines = 7 // sin cabecera de columnas ni pestañas
+		}
+	}
 	v := m.terminalHeight - headerLines - 2
 	if v < 3 {
 		v = 3
@@ -480,6 +532,9 @@ func (m *model) maxVisible() int {
 }
 
 func (m *model) ensureVisible() {
+	if m.ensureVisibleView() {
+		return
+	}
 	mv := m.maxVisible()
 	if m.cursor < m.scrollOffset {
 		m.scrollOffset = m.cursor
@@ -504,10 +559,19 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		wasTable := m.tableMode()
 		m.terminalHeight = msg.Height
 		m.terminalWidth = msg.Width
+		if wasTable != m.tableMode() {
+			m.refilterKeepCursor() // cambia el orden/pestañas al pasar de lista a tabla
+		} else {
+			m.ensureVisible()
+		}
 
 	case tea.KeyMsg:
+		if handled, cmd := m.handleViewKey(msg); handled {
+			return m, cmd
+		}
 		switch msg.Type {
 		case tea.KeyCtrlC:
 			m.quitting = true
@@ -531,17 +595,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 				m.ensureVisible()
 			}
-		case tea.KeyHome:
+		case tea.KeyHome, tea.KeyCtrlA:
 			m.cursor = 0
 			m.ensureVisible()
-		case tea.KeyEnd:
+		case tea.KeyEnd, tea.KeyCtrlE:
 			m.cursor = max(0, len(m.filtered)-1)
 			m.ensureVisible()
 		case tea.KeyPgUp:
 			m.cursor = max(0, m.cursor-10)
 			m.ensureVisible()
 		case tea.KeyPgDown:
-			m.cursor = min(len(m.filtered)-1, m.cursor+10)
+			m.cursor = max(0, min(len(m.filtered)-1, m.cursor+10)) // sin resultados no debe quedar en -1
 			m.ensureVisible()
 		case tea.KeyCtrlP:
 			// Toggle pin/unpin on the current item
@@ -567,6 +631,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						break
 					}
 				}
+				// Si el contexto salió de la lista (p.ej. unpin dentro de la pestaña ★ pins)
+				if m.cursor >= len(m.filtered) {
+					m.cursor = max(0, len(m.filtered)-1)
+				}
 				m.ensureVisible()
 			}
 		case tea.KeyCtrlT:
@@ -583,6 +651,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.shortNames = !m.shortNames
 			m.cfg.ShortNames = m.shortNames
 			_ = saveConfig(m.cfg)
+			m.ensureVisible() // los anchos (grid, tarjetas) dependen del nombre mostrado
 		case tea.KeyCtrlF:
 			// Toggle pinned-only filter
 			m.showPinnedOnly = !m.showPinnedOnly
@@ -611,7 +680,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) View() string {
+// viewList es la lista plana original (vista "list" y respaldo en terminales angostas).
+func (m model) viewList() string {
 	if m.quitting || m.chosen != "" {
 		return ""
 	}
@@ -624,6 +694,31 @@ func (m model) View() string {
 	if m.shortNames {
 		currentName = shortName(m.current)
 	}
+	// La línea no puede pasar del ancho de la terminal (rompería el alto de la pantalla): primero se recorta
+	// el nombre por la izquierda y, si aun así no cabe, el profile.
+	profile := m.selectedProfile()
+	if w := m.terminalWidth; w > 40 {
+		budget := w - 14 // sangría + "current " + holgura
+		if m.shortNames {
+			budget -= 8 // "[short] "
+		}
+		if currentAlias != "" {
+			budget -= len([]rune(currentAlias)) + 2
+		}
+		if m.activeGroup != "" || m.showPinnedOnly {
+			budget -= 14 // etiqueta [grupo] / [★ pinned]
+		}
+		profileCost := 0
+		if profile != "" {
+			profileCost = 12 + len([]rune(profile)) // "   ❯ profile " + nombre
+		}
+		if nameMax := max(10, budget-profileCost); len([]rune(currentName)) > nameMax {
+			currentName = truncateLeft(currentName, nameMax)
+		}
+		if over := len([]rune(currentName)) + profileCost - budget; profile != "" && over > 0 {
+			profile = truncateCell(profile, max(6, len([]rune(profile))-over))
+		}
+	}
 	if currentAlias != "" {
 		currentName += " " + aliasStyle.Render("@"+currentAlias)
 	}
@@ -632,6 +727,10 @@ func (m model) View() string {
 		currentDisplay = dimStyle.Render("[short] ") + currentValueStyle.Render(currentName)
 	} else {
 		currentDisplay = currentValueStyle.Render(currentName)
+	}
+	// Profile de ~/.aws/config del contexto seleccionado: cambia al moverse por la lista
+	if profile != "" {
+		currentDisplay += "   " + selectedItemStyle.Render("❯ ") + dimStyle.Render("profile ") + normalItemStyle.Render(profile)
 	}
 	filterLabel := ""
 	if m.activeGroup != "" {
@@ -654,16 +753,10 @@ func (m model) View() string {
 
 	if len(m.filtered) == 0 {
 		b.WriteString("\n  " + dimStyle.Render("  No matching contexts") + "\n")
-		return b.String()
+		return m.pinFooterToBottom(b.String())
 	}
 
-	maxVisible := m.maxVisible()
-
-	start := m.scrollOffset
-	end := start + maxVisible
-	if end > len(m.filtered) {
-		end = len(m.filtered)
-	}
+	start, end := m.window(len(m.filtered))
 
 	// ── Scroll indicator top ──
 	if start > 0 {
@@ -685,17 +778,22 @@ func (m model) View() string {
 		if m.shortNames {
 			displayCtx = shortName(ctx)
 		}
-
-		if i == m.cursor {
-			pointer = " ❯ "
-			name = selectedItemStyle.Render(displayCtx)
-		} else if isActive {
-			name = activeItemStyle.Render(displayCtx)
-		} else if isPinned {
-			name = pinItemStyle.Render(displayCtx)
-		} else {
-			name = normalItemStyle.Render(displayCtx)
+		// Un nombre más ancho que la terminal rompería el alto de la pantalla: recortar por la izquierda
+		if m.terminalWidth > 20 && len([]rune(displayCtx)) > m.terminalWidth-14 {
+			displayCtx = truncateLeft(displayCtx, m.terminalWidth-14)
 		}
+
+		nameSt := normalItemStyle
+		switch {
+		case i == m.cursor:
+			pointer = " ❯ "
+			nameSt = selectedItemStyle
+		case isActive:
+			nameSt = activeItemStyle
+		case isPinned:
+			nameSt = pinItemStyle
+		}
+		name = nameSt.Render(displayCtx)
 
 		extras := ""
 		if alias != "" {
@@ -716,20 +814,23 @@ func (m model) View() string {
 		b.WriteString("  " + dimStyle.Render(fmt.Sprintf("    ▼ %d more", len(m.filtered)-end)) + "\n")
 	}
 
-	// ── Footer ──
-	b.WriteString("\n")
-	counter := counterStyle.Render(fmt.Sprintf("  %d/%d", len(m.filtered), len(m.contexts)))
-	var help string
-	if m.terminalWidth >= 120 {
-		help = "  ↑↓ navigate · enter select · ctrl+p pin/unpin · ctrl+t jump-pin · ctrl+f pinned · ctrl+h short · esc · ctrl+c quit"
-	} else if m.terminalWidth >= 80 {
-		help = "  ↑↓ · enter · ^p pin · ^t pins · ^f pinned · ^h short · esc · ^c quit"
-	} else {
-		help = "  ↑↓ enter · ^p pin · ^f pinned · ^h short · esc ^c"
-	}
-	b.WriteString("  " + counter + helpStyle.Render(help) + "\n")
+	return m.pinFooterToBottom(b.String())
+}
 
-	return b.String()
+// listFooter es el pie de la lista original; usa el mismo formato en bloques que las demás vistas.
+func (m model) listFooter() string {
+	return m.footerLine(nil)
+}
+
+// pinFooterToBottom agrega el pie a la salida de la lista y lo deja en la última fila útil de la
+// terminal, aunque haya pocos resultados o ninguno (una fila menos que el alto, para no provocar scroll).
+func (m model) pinFooterToBottom(body string) string {
+	pad := m.terminalHeight - strings.Count(body, "\n") - 2 // 2 = separador + pie
+	if pad < 0 {
+		pad = 0
+	}
+	sep := "  " + dimStyle.Render(strings.Repeat("─", max(10, m.terminalWidth-6)))
+	return body + strings.Repeat("\n", pad) + sep + "\n" + m.listFooter() // sin "\n" final: el pie queda en la última fila
 }
 
 // ── Main ───────────────────────────────────────────────
@@ -821,8 +922,10 @@ Navigation (interactive mode):
   Type          Fuzzy search    ↑ / ↓       Move up / down
   Enter         Select          Esc         Clear filter / Quit
   Home / End    Top / Bottom    PgUp/PgDn   Jump 10 items
+  Ctrl+A / E    Top / Bottom (no Home/End keys needed)
   Ctrl+P        Pin/unpin       Ctrl+F      Show pinned only
   Ctrl+H        Short names     Ctrl+C      Quit
+  ← / → / Tab   Env tabs        Ctrl+V      Pick a view (11 layouts)
 
 Config stored in ~/.ksw.json
 `, version)
