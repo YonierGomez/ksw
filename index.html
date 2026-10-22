@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ksw – AI-Powered Kubernetes Context Switcher</title>
-  <meta name="description" content="ksw is an AI-powered interactive Kubernetes context switcher with AWS SSO management, EKS kubeconfig sync, natural language switching, fuzzy search, pins, aliases and groups — single binary, no dependencies." />
+  <meta name="description" content="ksw is an AI-powered interactive Kubernetes context switcher with 11 switchable cluster views, AWS SSO management, EKS kubeconfig sync with reports and retired-account cleanup, natural language switching, fuzzy search, pins, aliases and groups — single binary, no dependencies." />
   <meta name="keywords" content="kubernetes, context switcher, kubectl, kubeconfig, k8s, terminal, TUI, CLI, ksw, AI, natural language, LLM, OpenAI, Claude, Gemini, Bedrock" />
   <meta name="author" content="Yonier Gómez" />
 
@@ -377,6 +377,7 @@
     .cmt { color: #555; }
     .out { color: var(--green); }
     .warn { color: var(--red); }
+    .views-pre { white-space: pre; overflow-x: auto; line-height: 1.4; font-size: .8rem; }
 
     /* ── FOOTER ── */
     footer {
@@ -782,6 +783,7 @@
   <div class="nav-logo">⎈ <span>ksw</span></div>
   <ul class="nav-links">
     <li><a href="#features">Features</a></li>
+    <li><a href="#views">Views</a></li>
     <li><a href="#ai">AI</a></li>
     <li><a href="#sponsor">Sponsor</a></li>
     <li><a href="#install">Install</a></li>
@@ -959,6 +961,83 @@
       <h3>Non-interactive Mode</h3>
       <p>Use <code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">ksw -l</code> to list contexts in scripts and CI pipelines without launching the TUI.</p>
     </div>
+    <div class="feature-card">
+      <div class="feature-icon">🖼️</div>
+      <h3>11 Cluster Views</h3>
+      <p>List, kubectx-style, columns, grouped, tree, region, matrix, cards, grid and split. Press <code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">Ctrl+V</code> to pick one — it is remembered.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🚦</div>
+      <h3>Environment &amp; Profile Aware</h3>
+      <p>dev / qa / pdn / prod / sbx / lab detected from the name, production in red, plus the AWS profile and account of the selected cluster.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">↔️</div>
+      <h3>Short or Full Names</h3>
+      <p><code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">Ctrl+H</code> toggles <code style="color:var(--gray);font-family:'JetBrains Mono',monospace;">eks-payments-dev</code> ↔ the full ARN in every view. <code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">Ctrl+A</code>/<code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">Ctrl+E</code> jump to top/bottom.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📋</div>
+      <h3>Sync Reports</h3>
+      <p>After a sync you see exactly which accounts and clusters were added: profile, account ID and cluster, grouped per account.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🧹</div>
+      <h3>Retired Accounts Cleanup</h3>
+      <p>Accounts that disappeared from AWS SSO are detected, and you can remove their profiles and kubeconfig clusters — with confirmation and a backup.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🛡️</div>
+      <h3>Reliable Sync</h3>
+      <p>Exact-ARN matching, the right SSO token per session, automatic retries on transient AWS CLI errors and a progress bar that tells the truth.</p>
+    </div>
+  </div>
+</section>
+
+<!-- VIEWS SECTION -->
+<section class="usage" id="views">
+  <div class="usage-inner">
+    <p class="section-label">Cluster views</p>
+    <h2 class="section-title">Your clusters, your layout</h2>
+    <p class="section-sub">11 views one keystroke away. Environment-aware, with the AWS profile of every account — all derived locally from your kubeconfig.</p>
+
+    <div class="usage-grid stagger">
+      <div class="usage-card">
+        <div class="usage-card-header">cards — one card per app</div>
+        <div class="usage-card-body views-pre"><div><span style="color:#555">╭─ </span><span style="color:var(--purple)">payments</span><span style="color:#555"> ──────────────────── </span><span style="color:var(--green)">●</span> <span style="color:var(--green)">●</span> <span style="color:var(--green)">●</span><span style="color:#555"> ╮</span></div><div><span style="color:#555">│</span> <span style="color:var(--cyan)">❯</span> <span style="color:var(--green)">DEV </span> <span style="color:#ddd">eks-payments-dev </span><span style="color:#555">pay-dev</span>      <span style="color:#555">│</span></div><div><span style="color:#555">│</span>   <span style="color:#ffb86c">QA  </span> <span style="color:#ddd">eks-payments-qa  </span><span style="color:#555">pay-qa</span>       <span style="color:#555">│</span></div><div><span style="color:#555">│</span>   <span style="color:var(--red)">PDN </span> <span style="color:#ddd">eks-payments-pdn </span><span style="color:#555">pay-pdn</span>      <span style="color:#555">│</span></div><div><span style="color:#555">╰──────────────────────────────────────╯</span></div><div><span style="color:#555">╭─ </span><span style="color:var(--purple)">orders</span><span style="color:#555"> ────────────────────── </span><span style="color:var(--green)">●</span> <span style="color:var(--green)">●</span> <span style="color:#888">○</span><span style="color:#555"> ╮</span></div><div><span style="color:#555">│</span>   <span style="color:var(--green)">DEV </span> <span style="color:#ddd">eks-orders-dev   </span><span style="color:#555">ord-dev</span>      <span style="color:#555">│</span></div><div><span style="color:#555">│</span>   <span style="color:#ffb86c">QA  </span> <span style="color:#ddd">eks-orders-qa    </span><span style="color:#555">ord-qa</span>       <span style="color:#555">│</span></div><div><span style="color:#555">│</span>   <span style="color:#555">PDN  · none</span>                        <span style="color:#555">│</span></div><div><span style="color:#555">╰──────────────────────────────────────╯</span></div></div>
+      </div>
+      <div class="usage-card">
+        <div class="usage-card-header">tree — fold with Space</div>
+        <div class="usage-card-body views-pre"><div><span style="color:var(--purple)">▾ payments</span> <span style="color:#555">3</span></div><div><span style="color:#555">├─</span> <span style="color:#ddd">eks-payments-dev</span>      <span style="color:var(--green)">DEV</span></div><div><span style="color:#555">├─</span> <span style="color:#ddd">eks-payments-qa</span>       <span style="color:#ffb86c">QA</span></div><div><span style="color:#555">└─</span> <span style="color:#ddd">eks-payments-pdn</span>      <span style="color:var(--red)">PDN</span> <span style="color:var(--yellow)">★</span></div><div><span style="color:var(--purple)">▾ orders</span> <span style="color:#555">2</span></div><div><span style="color:#555">├─</span> <span style="color:var(--cyan)">❯ eks-orders-dev</span>       <span style="color:var(--green)">DEV</span></div><div><span style="color:#555">└─</span> <span style="color:#ddd">eks-orders-qa</span>         <span style="color:#ffb86c">QA</span></div><div><span style="color:var(--purple)">▸ billing</span> <span style="color:#555">3</span></div></div>
+      </div>
+      <div class="usage-card">
+        <div class="usage-card-header">matrix — apps × environments</div>
+        <div class="usage-card-body views-pre"><div><span style="color:#555">APP           </span> <span style="color:var(--green)">DEV</span>   <span style="color:#ffb86c">QA</span>   <span style="color:var(--red)">PDN</span></div><div><span style="color:var(--cyan)">❯</span> <span style="color:var(--cyan)">payments</span>     <span style="color:var(--cyan)">[●]</span>   <span style="color:var(--green)">●</span>    <span style="color:var(--red)">●</span></div><div>  <span style="color:#888">orders</span>        <span style="color:var(--green)">●</span>   <span style="color:#ffb86c">●</span>    <span style="color:#555">·</span></div><div>  <span style="color:#888">billing</span>       <span style="color:var(--green)">●</span>   <span style="color:#555">·</span>    <span style="color:#555">·</span></div><div>  <span style="color:#888">checkout</span>      <span style="color:var(--green)">●</span>   <span style="color:#ffb86c">●</span>    <span style="color:var(--red)">●</span></div><div> </div><div><span style="color:#555">● cluster  ◉ current  ★ pinned  [ ] selected</span></div></div>
+      </div>
+      <div class="usage-card">
+        <div class="usage-card-header">kubectx — fzf style</div>
+        <div class="usage-card-body views-pre"><div>  <span style="color:#888">eks-billing-dev</span></div><div>  <span style="color:#888">eks-checkout-qa</span></div><div>  <span style="color:#888">eks-orders-dev</span></div><div><span style="color:var(--cyan)">&gt;</span> <span style="color:var(--cyan)">eks-payments-dev</span>      <span style="color:#555">← cursor</span></div><div>  <span style="color:var(--green)">eks-payments-qa</span>       <span style="color:#555">← current</span></div><div>  <span style="color:#888">eks-payments-pdn</span></div><div>  <span style="color:var(--yellow)">42/42</span> <span style="color:#555">──────── ^h names · ^v views</span></div><div><span style="color:var(--cyan)">&gt;</span> <span style="color:#ddd">pay█</span></div></div>
+      </div>
+      <div class="usage-card">
+        <div class="usage-card-header">columns — env tabs + profile</div>
+        <div class="usage-card-body views-pre"><div><span style="color:#888">current</span> <span style="color:var(--green)">eks-orders-dev</span></div><div><span style="color:#888">profile</span> <span style="color:#ddd">pay-dev</span> <span style="color:#555">·</span> <span style="color:#ddd">account 111122223333</span> <span style="color:#555">·</span> <span style="color:#ddd">us-east-1</span></div><div><span style="color:#888">arn    </span> <span style="color:#555">arn:aws:eks:…:cluster/eks-payments-dev</span></div><div><span style="color:var(--cyan)">[ All 42 ]</span>  <span style="color:#888">dev 14  qa 14  pdn 14  ★ pins 3</span></div><div><span style="color:#555">CLUSTER             ENV   PROFILE</span></div><div><span style="color:var(--cyan)">❯ eks-payments-dev</span>  <span style="color:var(--green)">DEV</span>   <span style="color:#555">pay-dev</span>       <span style="color:var(--yellow)">★</span></div><div>  <span style="color:#ddd">eks-payments-qa</span>   <span style="color:#ffb86c">QA</span>    <span style="color:#555">pay-qa</span></div><div>  <span style="color:#ddd">eks-payments-pdn</span>  <span style="color:var(--red)">PDN</span>   <span style="color:#555">pay-pdn</span></div><div><span style="color:#555">──────────────────────────────────────────────</span></div><div><span style="color:var(--yellow)">42/42</span> <span style="color:var(--cyan)">columns</span> <span style="color:#555">│</span> <span style="color:var(--cyan)">↑↓</span> <span style="color:#555">move</span> <span style="color:var(--cyan)">⏎</span> <span style="color:#555">switch</span> <span style="color:#555">│</span> <span style="color:var(--cyan)">^v</span> <span style="color:#555">views</span></div></div>
+      </div>
+      <div class="usage-card">
+        <div class="usage-card-header">split — list + detail panel</div>
+        <div class="usage-card-body views-pre"><div><span style="color:var(--cyan)">❯ eks-payments-dev</span>  <span style="color:var(--green)">DEV</span>  <span style="color:#555">│</span> <span style="color:var(--purple)">eks-payments-dev</span></div><div>  <span style="color:#ddd">eks-payments-qa</span>   <span style="color:#ffb86c">QA</span>   <span style="color:#555">│</span> </div><div>  <span style="color:#ddd">eks-payments-pdn</span>  <span style="color:var(--red)">PDN</span>  <span style="color:#555">│</span> <span style="color:#888">env     </span> <span style="color:var(--green)">DEV</span></div><div>  <span style="color:#ddd">eks-orders-dev</span>    <span style="color:var(--green)">DEV</span>  <span style="color:#555">│</span> <span style="color:#888">profile </span> <span style="color:#ddd">pay-dev</span></div><div>  <span style="color:#ddd">eks-orders-qa</span>     <span style="color:#ffb86c">QA</span>   <span style="color:#555">│</span> <span style="color:#888">account </span> <span style="color:#ddd">111122223333</span></div><div>                         <span style="color:#555">│</span> <span style="color:#888">region  </span> <span style="color:#ddd">us-east-1</span></div><div>                         <span style="color:#555">│</span> <span style="color:#888">state   </span> <span style="color:var(--yellow)">★ pinned</span></div></div>
+      </div>
+      <div class="usage-card">
+        <div class="usage-card-header">Ctrl+V — view picker</div>
+        <div class="usage-card-body views-pre"><div><span style="color:var(--cyan)">Views</span>  <span style="color:#555">↑↓ select · enter apply · esc cancel</span></div><div> </div><div><span style="color:var(--cyan)">❯ list     </span> <span style="color:#555">original flat list</span></div><div>  <span style="color:#888">kubectx  </span> <span style="color:#555">fzf-style like kubectx</span></div><div>  <span style="color:#888">simple   </span> <span style="color:#555">list with env and profile</span></div><div>  <span style="color:#888">columns  </span> <span style="color:#555">table with env tabs</span></div><div>  <span style="color:#888">grouped  </span> <span style="color:#555">grouped by application</span></div><div>  <span style="color:#888">tree     </span> <span style="color:#555">foldable tree</span></div><div>  <span style="color:#888">region   </span> <span style="color:#555">foldable tree by region</span></div><div>  <span style="color:#888">matrix   </span> <span style="color:#555">apps × environments</span></div><div>  <span style="color:#888">cards    </span> <span style="color:#555">one card per app</span></div><div>  <span style="color:#888">grid     </span> <span style="color:#555">multi-column names</span></div><div>  <span style="color:#888">split    </span> <span style="color:#555">list + detail panel</span></div></div>
+      </div>
+      <div class="usage-card">
+        <div class="usage-card-header">Shortcuts</div>
+        <div class="usage-card-body views-pre"><div><span style="color:var(--cyan)">Ctrl+V </span>  <span style="color:#888">pick a view (remembered)</span></div><div><span style="color:var(--cyan)">← → Tab</span>  <span style="color:#888">switch tab · matrix env · card</span></div><div><span style="color:var(--cyan)">Space   </span>  <span style="color:#888">fold / unfold a group</span></div><div><span style="color:var(--cyan)">Ctrl+H  </span>  <span style="color:#888">short ↔ full names, every view</span></div><div><span style="color:var(--cyan)">Ctrl+A/E</span>  <span style="color:#888">top / bottom (also Home/End)</span></div><div><span style="color:var(--cyan)">Ctrl+P  </span>  <span style="color:#888">pin / unpin </span><span style="color:var(--yellow)">★</span></div><div><span style="color:var(--cyan)">Ctrl+F  </span>  <span style="color:#888">pinned only</span></div><div><span style="color:var(--cyan)">Ctrl+T  </span>  <span style="color:#888">jump to first pin</span></div></div>
+      </div>
+    </div>
+    <p style="text-align:center; color:var(--gray); font-size:.85rem; margin-top:2rem;">
+      Press <code style="color:var(--cyan); font-family:'JetBrains Mono',monospace;">Ctrl+V</code> in <code style="color:var(--cyan); font-family:'JetBrains Mono',monospace;">ksw</code> to switch. Your choice is remembered.
+    </p>
   </div>
 </section>
 
@@ -1108,7 +1187,7 @@
           <div><span class="cmd">$ ksw</span></div>
           <div><span class="cmt"># Opens the interactive TUI</span></div>
           <div><span class="cmt"># Type to fuzzy-search contexts</span></div>
-          <div><span class="cmt"># ↑↓ navigate · Ctrl+P pin · Ctrl+H short</span></div>
+          <div><span class="cmt"># ↑↓ · ←→ tabs · Ctrl+V views · Ctrl+P pin</span></div>
         </div>
       </div>
       <div class="usage-card">
@@ -1187,25 +1266,15 @@
       </div>
       <div class="usage-card" style="border-color: rgba(0,180,216,.3);">
         <div class="usage-card-header" style="background: linear-gradient(90deg, var(--bg3), rgba(0,180,216,.08));">⎈ EKS kubeconfig sync</div>
-        <div class="usage-card-body">
-          <div><span class="cmd">$ ksw eks kubeconfig sync</span></div>
-          <div><span style="color:#00b4d8;">  ⠸ Scanning... ████████░░  42 / 80</span></div>
-          <div><span class="out">  ✔ profile 'pay-dev' [us-east-1] — 2 cluster(s) found</span></div>
-          <div><span class="out">  ✔ Added: eks-payments-dev</span></div>
-          <div><span class="cmt">  · Skipped: eks-orders-qa (exists)</span></div>
-          <div><span class="out">  ✔ Done — 3 added, 12 skipped, 0 failed</span></div>
-        </div>
+        <div class="usage-card-body views-pre"><div><span style="color:var(--cyan)">$ ksw eks kubeconfig sync</span></div><div><span style="color:#555">  ⠸ Scanning...</span> <span style="color:var(--cyan)">████████</span><span style="color:#555">░░</span> <span style="color:#555">42 / 80</span></div><div><span style="color:var(--green)">  ✔ Kubeconfig sync — 3 added</span> <span style="color:#555">12 skipped</span></div><div> </div><div><span style="color:var(--green)">  ✚ NEW CLUSTERS ADDED</span> <span style="color:#555">3  ★ 1 new</span></div><div>  <span style="color:#555">╭───────────┬──────────────────┬───────────╮</span></div><div>  <span style="color:#555">│</span> <span style="color:var(--cyan)">Profile</span>   <span style="color:#555">│</span> <span style="color:var(--cyan)">Cluster</span>          <span style="color:#555">│</span> <span style="color:var(--cyan)">Region</span>    <span style="color:#555">│</span></div><div>  <span style="color:#555">├───────────┼──────────────────┼───────────┤</span></div><div>  <span style="color:#555">│</span> <span style="color:var(--green)">★ pay-dev</span> <span style="color:#555">│</span> <span style="color:#ddd">eks-pay-dev</span>      <span style="color:#555">│</span> <span style="color:#888">us-east-1</span> <span style="color:#555">│</span></div><div>  <span style="color:#555">│</span>           <span style="color:#555">│</span> <span style="color:#ddd">eks-pay-batch</span>    <span style="color:#555">│</span> <span style="color:#888">us-east-1</span> <span style="color:#555">│</span></div><div>  <span style="color:#555">│</span> <span style="color:var(--green)">ord-qa</span>    <span style="color:#555">│</span> <span style="color:#ddd">eks-orders-qa</span>    <span style="color:#555">│</span> <span style="color:#888">us-east-2</span> <span style="color:#555">│</span></div><div>  <span style="color:#555">╰───────────┴──────────────────┴───────────╯</span></div></div>
       </div>
       <div class="usage-card" style="border-color: rgba(241,250,140,.2);">
         <div class="usage-card-header" style="background: linear-gradient(90deg, var(--bg3), rgba(241,250,140,.06));">★ AWS SSO profiles sync (premium)</div>
-        <div class="usage-card-body">
-          <div><span class="cmd">$ ksw aws sso profiles sync</span></div>
-          <div><span style="color:var(--yellow);">  ⠸ Syncing... ██████░░░░  64 / 120</span></div>
-          <div><span class="out">  ✔ Added profile 'payments-dev'</span></div>
-          <div><span class="out">  ✔ Added profile 'orders-qa'</span></div>
-          <div><span class="cmt">  · Skipped 'infra-pdn' (up to date)</span></div>
-          <div><span class="out">  ✔ Done — 18 added, 46 skipped</span></div>
-        </div>
+        <div class="usage-card-body views-pre"><div><span style="color:var(--cyan)">$ ksw aws sso profiles sync</span></div><div><span style="color:var(--green)">  ✔ Sync complete — 2 added, 1 fixed</span></div><div> </div><div><span style="color:var(--green)">  ✚ NEW ACCOUNTS ADDED</span> <span style="color:#555">2</span></div><div>  <span style="color:#555">╭───────────┬──────────────┬────────────────╮</span></div><div>  <span style="color:#555">│</span> <span style="color:var(--cyan)">Profile</span>   <span style="color:#555">│</span> <span style="color:var(--cyan)">Account ID</span>   <span style="color:#555">│</span> <span style="color:var(--cyan)">SSO account</span>    <span style="color:#555">│</span></div><div>  <span style="color:#555">├───────────┼──────────────┼────────────────┤</span></div><div>  <span style="color:#555">│</span> <span style="color:var(--green)">pay-dev</span>   <span style="color:#555">│</span> <span style="color:#ddd">111122223333</span> <span style="color:#555">│</span> <span style="color:#888">PaymentsDev</span>    <span style="color:#555">│</span></div><div>  <span style="color:#555">│</span> <span style="color:var(--green)">ord-qa</span>    <span style="color:#555">│</span> <span style="color:#ddd">444455556666</span> <span style="color:#555">│</span> <span style="color:#888">OrdersQa</span>       <span style="color:#555">│</span></div><div>  <span style="color:#555">╰───────────┴──────────────┴────────────────╯</span></div><div><span style="color:#555">  Backup: ~/.aws/config.backup.20261020</span></div></div>
+      </div>
+      <div class="usage-card" style="border-color: rgba(255,184,108,.3);">
+        <div class="usage-card-header" style="background: linear-gradient(90deg, var(--bg3), rgba(255,184,108,.08));">🧹 Retired accounts cleanup</div>
+        <div class="usage-card-body views-pre"><div><span style="color:var(--cyan)">$ ksw aws sso profiles sync</span></div><div><span style="color:#ffb86c">  ⚠ NO LONGER IN AWS SSO</span> <span style="color:#555">1</span></div><div>  <span style="color:#555">╭─────────────┬──────────────┬──────────╮</span></div><div>  <span style="color:#555">│</span> <span style="color:var(--cyan)">Profile</span>     <span style="color:#555">│</span> <span style="color:var(--cyan)">Account ID</span>   <span style="color:#555">│</span> <span style="color:var(--cyan)">Clusters</span> <span style="color:#555">│</span></div><div>  <span style="color:#555">├─────────────┼──────────────┼──────────┤</span></div><div>  <span style="color:#555">│</span> <span style="color:#ddd">old-sandbox</span> <span style="color:#555">│</span> <span style="color:#ddd">999999999999</span> <span style="color:#555">│</span> <span style="color:#ffb86c">2</span>        <span style="color:#555">│</span></div><div>  <span style="color:#555">╰─────────────┴──────────────┴──────────╯</span></div><div><span style="color:#ffb86c">  ?</span> <span style="color:#ddd">Remove these accounts?</span> <span style="color:#555">[y] all [s] select [N]</span> <span style="color:var(--cyan)">y</span></div><div><span style="color:#ffb86c">  ?</span> <span style="color:#ddd">Also remove 2 clusters?</span> <span style="color:#555">[Y/n]</span> <span style="color:var(--cyan)">y</span></div><div><span style="color:var(--green)">  ✔ Removed 1 profile</span></div><div><span style="color:var(--green)">  ✔ Removed 2 clusters from kubeconfig</span></div><div><span style="color:#555">  Backup of ~/.aws/config created first</span></div></div>
       </div>
     </div>
   </div>
